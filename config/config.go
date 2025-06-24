@@ -6,11 +6,12 @@ import (
 )
 
 var (
-	DB_USER     = getEnv("DB_USER", "root")
-	DB_PASSWORD = getEnv("DB_PASSWORD", "")
-	DB_NAME     = getEnv("DB_NAME", "aviation_booking")
-	DB_HOST     = getEnv("DB_HOST", "localhost")
-	DB_PORT     = getEnv("DB_PORT", "3306")
+	DB_USER       = getEnv("DB_USER", "root")
+	DB_PASSWORD   = getEnv("DB_PASSWORD", "")
+	DB_NAME       = getEnv("DB_NAME", "aviation_booking")
+	DB_HOST       = getEnv("DB_HOST", "localhost")
+	DB_PORT       = getEnv("DB_PORT", "3306")
+	AmadeusAPIKey = getEnv("AMADEUS_API_KEY", "")
 )
 
 func getEnv(key string, defaultValue string) string {

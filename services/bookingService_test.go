@@ -1,40 +1,28 @@
 package services
 
 import (
-	"aviation-booking/config" // Импортируем конфигурацию с базой данных
-	"aviation-booking/models" // Импортируем модели данных
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBookFlight(t *testing.T) {
-	// Инициализируем тестовую базу данных
-	config.InitTestDB()
-	defer config.CloseTestDB()
+func TestGetFlightsFromAmadeus(t *testing.T) {
+	// Тестируем поиск рейсов с известными параметрами
+	origin := "LON"
+	destination := "NYC"
+	departureDate := "2023-12-01"
 
-	// Создаем тестовые данные
-	flight := &models.Flight{
-		DepartureCity:  "Moscow",
-		ArrivalCity:    "Paris",
-		DepartureTime:  "2023-12-01T10:00:00Z",
-		ArrivalTime:    "2023-12-01T14:00:00Z",
-		Price:          150.00,
-		AvailableSeats: 10,
-	}
+	// Выполняем запрос
+	flights, err := GetFlightsFromAmadeus(origin, destination, departureDate)
 
-	// Добавляем рейс в базу данных
-	if err := config.TestDB.Create(flight).Error; err != nil {
-		t.Fatalf("Failed to create flight: %v", err)
-	}
-
-	// Тестируем успешное бронирование
-	err := BookFlight(flight)
+	// Проверяем, что ошибок нет
 	assert.NoError(t, err)
-	assert.Equal(t, 9, flight.AvailableSeats) // Проверяем, что количество мест уменьшилось на 1
 
-	// Тестируем бронирование без доступных мест
-	flight.AvailableSeats = 0
-	err = BookFlight(flight)
-	assert.EqualError(t, err, "No available seats") // Проверяем, что ошибка "No available seats"
+	// Проверяем, что возвращен хотя бы один рейс
+	assert.Greater(t, len(flights), 0)
+
+	// Проверяем структуру данных
+	assert.NotEmpty(t, flights[0].ID)
+	assert.NotEmpty(t, flights[0].Price.Total)
+	assert.NotEmpty(t, flights[0].Departure.AirportCode)
 }
