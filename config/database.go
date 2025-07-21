@@ -14,7 +14,7 @@ var DB *gorm.DB // Основная база данных
 // InitDB инициализирует подключение к основной базе данных MySQL
 func InitDB() {
 	var err error
-
+	//fmt.Println("initDb")
 	// Строка подключения к MySQL (формат: user:password@tcp(host:port)/dbname)
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
 		DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
