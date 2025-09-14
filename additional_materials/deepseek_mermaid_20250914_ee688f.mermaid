@@ -1,0 +1,40 @@
+flowchart TD
+    subgraph External [Внешние сервисы]
+        A[Браузер/Мобильное приложение]
+        B[Партнерские API<br>авиакомпаний]
+    end
+
+    subgraph GoDomain [Микросервис на Go]
+        C[Go API Gateway]
+        C --> D[Обработчик запросов<br>Маршрутизация]
+        C --> E[Аутентификация<br>и Валидация]
+        C --> F[Кэширование<br>Redis]
+        C --> G[Работа с БД<br>PostgreSQL]
+    end
+
+    subgraph PythonDomain [Микросервис на Python]
+        H[Python ML Service]
+        I[Парсинг и ETL<br>Pandas, Requests]
+        J[ML Модели<br>Scikit-learn, LightGBM]
+        K[Асинхронные задачи<br>Celery]
+    end
+
+    subgraph Infrastructure [Инфраструктура]
+        L[Очередь сообщений<br>RabbitMQ/NATS]
+        M[База данных<br>PostgreSQL]
+        N[Кэш<br>Redis]
+    end
+
+    A -- HTTP/GRPC запросы --> C
+    B -- Получение данных --> I
+
+    C <-->|Чтение/Запись| M
+    C <-->|Кэширование| N
+
+    C -- Отправка задач в очередь --> L
+    L -- Получение задач --> K
+    K -- Вызов методов --> H
+
+    H -- Обучение моделей<br>и прогнозирование --> J
+    H -- Обработка данных --> I
+    H -- Доступ к данным --> M
