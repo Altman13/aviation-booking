@@ -1,22 +1,47 @@
 package models
 
 import (
-	"github.com/jinzhu/gorm"
+	"time"
+
+	"gorm.io/gorm"
 )
 
 type User struct {
-	ID    uint   `json:"id" gorm:"primary_key"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	Name      string    `json:"name" binding:"required"`
+	Email     string    `json:"email" gorm:"uniqueIndex" binding:"required,email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (u *User) CreateUser(db *gorm.DB) error {
+// Create создает нового пользователя в базе данных
+func (u *User) Create(db *gorm.DB) error {
 	return db.Create(u).Error
 }
 
-func GetUserByID(db *gorm.DB, id uint) (*User, error) {
-	var user User
-	err := db.Where("id = ?", id).First(&user).Error
-	return &user, err
+// GetByID получает пользователя по ID
+func (u *User) GetByID(db *gorm.DB, id uint) error {
+	return db.First(u, id).Error
+}
+
+// GetByEmail получает пользователя по email
+func (u *User) GetByEmail(db *gorm.DB, email string) error {
+	return db.Where("email = ?", email).First(u).Error
+}
+
+// Update обновляет пользователя в базе данных
+func (u *User) Update(db *gorm.DB) error {
+	return db.Save(u).Error
+}
+
+// Delete удаляет пользователя из базы данных
+func (u *User) Delete(db *gorm.DB) error {
+	return db.Delete(u).Error
+}
+
+// GetAll получает всех пользователей
+func (u *User) GetAll(db *gorm.DB) ([]User, error) {
+	var users []User
+	err := db.Find(&users).Error
+	return users, err
 }

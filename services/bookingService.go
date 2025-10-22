@@ -1,91 +1,212 @@
 package services
 
-import "time"
-
-// Booking представляет информацию о бронировании
-type Booking struct {
-	ID        string  `json:"id"`
-	FlightID  string  `json:"flight_id"`
-	UserID    string  `json:"user_id"`
-	Seats     int     `json:"seats"`
-	Class     string  `json:"class"`
-	TotalCost float64 `json:"total_cost"`
-	Status    string  `json:"status"`
-	CreatedAt string  `json:"created_at"`
-}
+import (
+	"aviation-booking/config"
+	"aviation-booking/models"
+	"errors"
+)
 
 // CreateBooking - создание нового бронирования
-func CreateBooking(flightID, userID string, seats int, class string) (*Booking, error) {
+func CreateBooking(flightID, userID uint, seats int, class string) (*models.Booking, error) {
+	db := config.DB
+
+	// Проверяем существование рейса
+	var flight models.Flight
+	if err := db.First(&flight, flightID).Error; err != nil {
+		return nil, errors.New("flight not found")
+	}
+
+	// Проверяем существование пользователя
+	var user models.User
+	if err := db.First(&user, userID).Error; err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	// Проверяем доступность мест
+	if flight.AvailableSeats < seats {
+		return nil, errors.New("not enough available seats")
+	}
+
 	// Если класс не указан, используем economy по умолчанию
 	if class == "" {
 		class = "economy"
 	}
 
-	// Временная заглушка - в реальном приложении здесь будет логика работы с БД
-	booking := &Booking{
-		ID:        "booking-" + generateID(),
-		FlightID:  flightID,
-		UserID:    userID,
-		Seats:     seats,
-		Class:     class,
-		TotalCost: calculateTotalCost(flightID, seats, class),
-		Status:    "confirmed",
-		CreatedAt: time.Now().Format(time.RFC3339),
+	// Рассчитываем общую стоимость
+	totalPrice := calculateTotalCost(flight.Price, seats, class)
+
+	// Создаем бронирование
+	booking := &models.Booking{
+		FlightID:   flightID,
+		UserID:     userID,
+		Seats:      seats,
+		Class:      class,
+		TotalPrice: totalPrice,
+		Status:     "confirmed",
+	}
+
+	// Начинаем транзакцию вручную
+	tx := db.Begin()
+
+	// Сохраняем бронирование в БД
+	if err := tx.Create(booking).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	// Обновляем количество доступных мест
+	if err := tx.Model(&flight).Update("available_seats", flight.AvailableSeats-seats).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	// Коммитим транзакцию
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
 	}
 
 	return booking, nil
 }
 
 // GetUserBookings - получение бронирований пользователя
-func GetUserBookings(userID string) ([]Booking, error) {
-	// Временная заглушка - в реальном приложении здесь будет запрос к БД
-	bookings := []Booking{
-		{
-			ID:        "booking-001",
-			FlightID:  "SU-1234",
-			UserID:    userID,
-			Seats:     2,
-			Class:     "economy",
-			TotalCost: 10000.00,
-			Status:    "confirmed",
-			CreatedAt: "2024-01-15T12:00:00Z",
-		},
-		{
-			ID:        "booking-002",
-			FlightID:  "S7-5678",
-			UserID:    userID,
-			Seats:     1,
-			Class:     "business",
-			TotalCost: 25000.00,
-			Status:    "confirmed",
-			CreatedAt: "2024-01-16T14:30:00Z",
-		},
+func GetUserBookings(userID uint) ([]models.Booking, error) {
+	db := config.DB
+
+	// Проверяем существование пользователя
+	var user models.User
+	if err := db.First(&user, userID).Error; err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	var bookings []models.Booking
+	if err := db.Preload("Flight").Where("user_id = ?", userID).Find(&bookings).Error; err != nil {
+		return nil, err
 	}
 
 	return bookings, nil
 }
 
 // CancelBooking - отмена бронирования
-func CancelBooking(bookingID string) error {
-	// Временная заглушка - в реальном приложении здесь будет логика отмены в БД
-	// Проверяем существование бронирования и т.д.
+func CancelBooking(bookingID uint) error {
+	db := config.DB
 
-	// Симулируем успешную отмену
+	// Находим бронирование
+	var booking models.Booking
+	if err := db.First(&booking, bookingID).Error; err != nil {
+		return errors.New("booking not found")
+	}
+
+	// Проверяем, не отменено ли уже бронирование
+	if booking.Status == "cancelled" {
+		return errors.New("booking already cancelled")
+	}
+
+	// Находим рейс для возврата мест
+	var flight models.Flight
+	if err := db.First(&flight, booking.FlightID).Error; err != nil {
+		return errors.New("flight not found")
+	}
+
+	// Начинаем транзакцию вручную
+	tx := db.Begin()
+
+	// Отменяем бронирование
+	if err := tx.Model(&booking).Update("status", "cancelled").Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Возвращаем места
+	if err := tx.Model(&flight).Update("available_seats", flight.AvailableSeats+booking.Seats).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Коммитим транзакцию
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Вспомогательные функции
-func generateID() string {
-	return time.Now().Format("20060102150405")
+// GetBookingByID - получение бронирования по ID
+func GetBookingByID(bookingID uint) (*models.Booking, error) {
+	db := config.DB
+
+	var booking models.Booking
+	if err := db.Preload("Flight").Preload("User").First(&booking, bookingID).Error; err != nil {
+		return nil, err
+	}
+
+	return &booking, nil
 }
 
-func calculateTotalCost(flightID string, seats int, class string) float64 {
-	// Временная логика расчета стоимости
-	basePrice := 5000.0
-	if class == "business" {
-		basePrice = 15000.0
-	} else if class == "first" {
-		basePrice = 30000.0
+// UpdateBooking - обновление бронирования
+func UpdateBooking(bookingID uint, seats int, class string) (*models.Booking, error) {
+	db := config.DB
+
+	// Находим бронирование
+	var booking models.Booking
+	if err := db.First(&booking, bookingID).Error; err != nil {
+		return nil, errors.New("booking not found")
 	}
-	return basePrice * float64(seats)
+
+	// Находим рейс
+	var flight models.Flight
+	if err := db.First(&flight, booking.FlightID).Error; err != nil {
+		return nil, errors.New("flight not found")
+	}
+
+	// Рассчитываем разницу в местах
+	seatDifference := seats - booking.Seats
+
+	// Проверяем доступность мест при увеличении количества
+	if seatDifference > 0 && flight.AvailableSeats < seatDifference {
+		return nil, errors.New("not enough available seats")
+	}
+
+	// Начинаем транзакцию вручную
+	tx := db.Begin()
+
+	// Обновляем количество доступных мест
+	if err := tx.Model(&flight).Update("available_seats", flight.AvailableSeats-seatDifference).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	// Обновляем данные бронирования
+	booking.Seats = seats
+	booking.Class = class
+	booking.TotalPrice = calculateTotalCost(flight.Price, seats, class)
+
+	if err := tx.Save(&booking).Error; err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	// Коммитим транзакцию
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+
+	return &booking, nil
+}
+
+// calculateTotalCost - расчет общей стоимости бронирования
+func calculateTotalCost(basePrice float64, seats int, class string) float64 {
+	// Множители для разных классов
+	classMultipliers := map[string]float64{
+		"economy":  1.0,
+		"comfort":  1.5,
+		"business": 2.5,
+		"first":    4.0,
+	}
+
+	multiplier := classMultipliers["economy"] // по умолчанию
+	if m, exists := classMultipliers[class]; exists {
+		multiplier = m
+	}
+
+	return basePrice * float64(seats) * multiplier
 }

@@ -1,293 +1,490 @@
 package services
 
 import (
+	"aviation-booking/config"
+	"aviation-booking/models"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+	"gorm.io/gorm"
 )
 
-// Mock базы данных или хранилища
-type MockBookingRepository struct {
-	mock.Mock
+type BookingServiceTestSuite struct {
+	suite.Suite
+	db *gorm.DB
 }
 
-func (m *MockBookingRepository) CreateBooking(booking *Booking) error {
-	args := m.Called(booking)
-	return args.Error(0)
+func (suite *BookingServiceTestSuite) SetupTest() {
+	// Используем тестовую базу данных
+	config.InitTestDB()
+	suite.db = config.TestDB
+
+	// Очищаем таблицы перед каждым тестом
+	suite.db.Exec("DELETE FROM bookings")
+	suite.db.Exec("DELETE FROM flights")
+	suite.db.Exec("DELETE FROM users")
 }
 
-func (m *MockBookingRepository) GetUserBookings(userID string) ([]Booking, error) {
-	args := m.Called(userID)
-	return args.Get(0).([]Booking), args.Error(1)
+func (suite *BookingServiceTestSuite) TearDownTest() {
+	config.CloseTestDB()
 }
 
-func (m *MockBookingRepository) CancelBooking(bookingID string) error {
-	args := m.Called(bookingID)
-	return args.Error(0)
+func TestBookingServiceSuite(t *testing.T) {
+	suite.Run(t, new(BookingServiceTestSuite))
 }
 
-func TestCreateBooking(t *testing.T) {
+func (suite *BookingServiceTestSuite) TestCreateBooking_Success() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	// Тестируем создание бронирования
+	booking, err := CreateBooking(flight.ID, user.ID, 2, "economy")
+
+	suite.NoError(err)
+	suite.NotNil(booking)
+	suite.Equal(flight.ID, booking.FlightID)
+	suite.Equal(user.ID, booking.UserID)
+	suite.Equal(2, booking.Seats)
+	suite.Equal("economy", booking.Class)
+	suite.Equal("confirmed", booking.Status)
+	suite.Equal(10000.0, booking.TotalPrice) // 5000 * 2 * 1.0
+
+	// Проверяем, что количество мест уменьшилось
+	var updatedFlight models.Flight
+	suite.db.First(&updatedFlight, flight.ID)
+	suite.Equal(98, updatedFlight.AvailableSeats)
+}
+
+func (suite *BookingServiceTestSuite) TestCreateBooking_NotEnoughSeats() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 5,
+	}
+	suite.db.Create(&flight)
+
+	// Пытаемся забронировать больше мест, чем доступно
+	booking, err := CreateBooking(flight.ID, user.ID, 10, "economy")
+
+	suite.Error(err)
+	suite.Nil(booking)
+	suite.Equal("not enough available seats", err.Error())
+
+	// Проверяем, что количество мест не изменилось
+	var updatedFlight models.Flight
+	suite.db.First(&updatedFlight, flight.ID)
+	suite.Equal(5, updatedFlight.AvailableSeats)
+}
+
+func (suite *BookingServiceTestSuite) TestCreateBooking_FlightNotFound() {
+	// Создаем только пользователя
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	// Пытаемся забронировать несуществующий рейс
+	booking, err := CreateBooking(999, user.ID, 2, "economy")
+
+	suite.Error(err)
+	suite.Nil(booking)
+	suite.Equal("flight not found", err.Error())
+}
+
+func (suite *BookingServiceTestSuite) TestCreateBooking_UserNotFound() {
+	// Создаем только рейс
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	// Пытаемся забронировать от несуществующего пользователя
+	booking, err := CreateBooking(flight.ID, 999, 2, "economy")
+
+	suite.Error(err)
+	suite.Nil(booking)
+	suite.Equal("user not found", err.Error())
+}
+
+func (suite *BookingServiceTestSuite) TestCreateBooking_DefaultClass() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	// Создаем бронирование без указания класса
+	booking, err := CreateBooking(flight.ID, user.ID, 2, "")
+
+	suite.NoError(err)
+	suite.NotNil(booking)
+	suite.Equal("economy", booking.Class) // Должен использоваться класс по умолчанию
+}
+
+func (suite *BookingServiceTestSuite) TestGetUserBookings_Success() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	// Создаем несколько бронирований
+	booking1 := models.Booking{
+		FlightID:   flight.ID,
+		UserID:     user.ID,
+		Seats:      2,
+		Class:      "economy",
+		TotalPrice: 10000.0,
+		Status:     "confirmed",
+	}
+	suite.db.Create(&booking1)
+
+	booking2 := models.Booking{
+		FlightID:   flight.ID,
+		UserID:     user.ID,
+		Seats:      1,
+		Class:      "business",
+		TotalPrice: 12500.0,
+		Status:     "confirmed",
+	}
+	suite.db.Create(&booking2)
+
+	// Получаем бронирования пользователя
+	bookings, err := GetUserBookings(user.ID)
+
+	suite.NoError(err)
+	suite.Len(bookings, 2)
+	suite.Equal(booking1.ID, bookings[0].ID)
+	suite.Equal(booking2.ID, bookings[1].ID)
+	suite.Equal("economy", bookings[0].Class)
+	suite.Equal("business", bookings[1].Class)
+}
+
+func (suite *BookingServiceTestSuite) TestGetUserBookings_UserNotFound() {
+	// Пытаемся получить бронирования несуществующего пользователя
+	bookings, err := GetUserBookings(999)
+
+	suite.Error(err)
+	suite.Nil(bookings)
+	suite.Equal("user not found", err.Error())
+}
+
+func (suite *BookingServiceTestSuite) TestCancelBooking_Success() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	booking := models.Booking{
+		FlightID:   flight.ID,
+		UserID:     user.ID,
+		Seats:      2,
+		Class:      "economy",
+		TotalPrice: 10000.0,
+		Status:     "confirmed",
+	}
+	suite.db.Create(&booking)
+
+	// Отменяем бронирование
+	err := CancelBooking(booking.ID)
+
+	suite.NoError(err)
+
+	// Проверяем, что статус изменился
+	var cancelledBooking models.Booking
+	suite.db.First(&cancelledBooking, booking.ID)
+	suite.Equal("cancelled", cancelledBooking.Status)
+
+	// Проверяем, что места вернулись
+	var updatedFlight models.Flight
+	suite.db.First(&updatedFlight, flight.ID)
+	suite.Equal(102, updatedFlight.AvailableSeats) // 100 + 2
+}
+
+func (suite *BookingServiceTestSuite) TestCancelBooking_AlreadyCancelled() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	booking := models.Booking{
+		FlightID:   flight.ID,
+		UserID:     user.ID,
+		Seats:      2,
+		Class:      "economy",
+		TotalPrice: 10000.0,
+		Status:     "cancelled", // Уже отменено
+	}
+	suite.db.Create(&booking)
+
+	// Пытаемся отменить уже отмененное бронирование
+	err := CancelBooking(booking.ID)
+
+	suite.Error(err)
+	suite.Equal("booking already cancelled", err.Error())
+}
+
+func (suite *BookingServiceTestSuite) TestCancelBooking_NotFound() {
+	// Пытаемся отменить несуществующее бронирование
+	err := CancelBooking(999)
+
+	suite.Error(err)
+	suite.Equal("booking not found", err.Error())
+}
+
+func (suite *BookingServiceTestSuite) TestGetBookingByID_Success() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	booking := models.Booking{
+		FlightID:   flight.ID,
+		UserID:     user.ID,
+		Seats:      2,
+		Class:      "economy",
+		TotalPrice: 10000.0,
+		Status:     "confirmed",
+	}
+	suite.db.Create(&booking)
+
+	// Получаем бронирование по ID
+	result, err := GetBookingByID(booking.ID)
+
+	suite.NoError(err)
+	suite.NotNil(result)
+	suite.Equal(booking.ID, result.ID)
+	suite.Equal(flight.ID, result.FlightID)
+	suite.Equal(user.ID, result.UserID)
+}
+
+func (suite *BookingServiceTestSuite) TestGetBookingByID_NotFound() {
+	// Пытаемся получить несуществующее бронирование
+	result, err := GetBookingByID(999)
+
+	suite.Error(err)
+	suite.Nil(result)
+}
+
+func (suite *BookingServiceTestSuite) TestUpdateBooking_Success() {
+	// Создаем тестовые данные
+	user := models.User{
+		Name:  "Test User",
+		Email: "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 100,
+	}
+	suite.db.Create(&flight)
+
+	booking := models.Booking{
+		FlightID:   flight.ID,
+		UserID:     user.ID,
+		Seats:      2,
+		Class:      "economy",
+		TotalPrice: 10000.0,
+		Status:     "confirmed",
+	}
+	suite.db.Create(&booking)
+
+	// Обновляем бронирование
+	updatedBooking, err := UpdateBooking(booking.ID, 3, "business")
+
+	suite.NoError(err)
+	suite.NotNil(updatedBooking)
+	suite.Equal(3, updatedBooking.Seats)
+	suite.Equal("business", updatedBooking.Class)
+	suite.Equal(37500.0, updatedBooking.TotalPrice) // 5000 * 3 * 2.5
+
+	// Проверяем, что количество мест обновилось
+	var updatedFlight models.Flight
+	suite.db.First(&updatedFlight, flight.ID)
+	suite.Equal(99, updatedFlight.AvailableSeats) // 100 - 1 (увеличили с 2 до 3 мест)
+}
+
+func (suite *BookingServiceTestSuite) TestCalculateTotalCost() {
 	tests := []struct {
-		name          string
-		flightID      string
-		userID        string
-		seats         int
-		class         string
-		expectedClass string
-		expectedCost  float64
-		expectError   bool
+		name      string
+		basePrice float64
+		seats     int
+		class     string
+		expected  float64
 	}{
 		{
-			name:          "Успешное создание бронирования economy класса",
-			flightID:      "SU-1234",
-			userID:        "user-123",
-			seats:         2,
-			class:         "economy",
-			expectedClass: "economy",
-			expectedCost:  10000.0, // 5000 * 2
-			expectError:   false,
+			name:      "Economy класс, 1 место",
+			basePrice: 5000.0,
+			seats:     1,
+			class:     "economy",
+			expected:  5000.0,
 		},
 		{
-			name:          "Успешное создание бронирования business класса",
-			flightID:      "SU-5678",
-			userID:        "user-456",
-			seats:         1,
-			class:         "business",
-			expectedClass: "business",
-			expectedCost:  15000.0, // 15000 * 1
-			expectError:   false,
+			name:      "Economy класс, 3 места",
+			basePrice: 5000.0,
+			seats:     3,
+			class:     "economy",
+			expected:  15000.0,
 		},
 		{
-			name:          "Создание бронирования с классом по умолчанию",
-			flightID:      "SU-9012",
-			userID:        "user-789",
-			seats:         3,
-			class:         "",
-			expectedClass: "economy",
-			expectedCost:  15000.0, // 5000 * 3
-			expectError:   false,
+			name:      "Business класс, 1 место",
+			basePrice: 5000.0,
+			seats:     1,
+			class:     "business",
+			expected:  12500.0,
 		},
 		{
-			name:          "Создание бронирования first класса",
-			flightID:      "SU-3456",
-			userID:        "user-111",
-			seats:         2,
-			class:         "first",
-			expectedClass: "first",
-			expectedCost:  60000.0, // 30000 * 2
-			expectError:   false,
+			name:      "Business класс, 2 места",
+			basePrice: 5000.0,
+			seats:     2,
+			class:     "business",
+			expected:  25000.0,
+		},
+		{
+			name:      "First класс, 1 место",
+			basePrice: 5000.0,
+			seats:     1,
+			class:     "first",
+			expected:  20000.0,
+		},
+		{
+			name:      "Comfort класс, 2 места",
+			basePrice: 5000.0,
+			seats:     2,
+			class:     "comfort",
+			expected:  15000.0,
+		},
+		{
+			name:      "Неизвестный класс (должен использовать economy)",
+			basePrice: 5000.0,
+			seats:     2,
+			class:     "unknown",
+			expected:  10000.0,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Выполняем создание бронирования
-			booking, err := CreateBooking(tt.flightID, tt.userID, tt.seats, tt.class)
-
-			// Проверяем ошибки
-			if tt.expectError {
-				assert.Error(t, err)
-				assert.Nil(t, booking)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, booking)
-
-				// Проверяем поля бронирования
-				assert.NotEmpty(t, booking.ID)
-				assert.Contains(t, booking.ID, "booking-")
-				assert.Equal(t, tt.flightID, booking.FlightID)
-				assert.Equal(t, tt.userID, booking.UserID)
-				assert.Equal(t, tt.seats, booking.Seats)
-				assert.Equal(t, tt.expectedClass, booking.Class)
-				assert.Equal(t, tt.expectedCost, booking.TotalCost)
-				assert.Equal(t, "confirmed", booking.Status)
-
-				// Проверяем корректность времени создания
-				_, err := time.Parse(time.RFC3339, booking.CreatedAt)
-				assert.NoError(t, err)
-			}
+		suite.Run(tt.name, func() {
+			result := calculateTotalCost(tt.basePrice, tt.seats, tt.class)
+			suite.Equal(tt.expected, result)
 		})
 	}
-}
-
-func TestGetUserBookings(t *testing.T) {
-	tests := []struct {
-		name            string
-		userID          string
-		expectedCount   int
-		expectedFirstID string
-	}{
-		{
-			name:            "Получение бронирований существующего пользователя",
-			userID:          "user-123",
-			expectedCount:   2,
-			expectedFirstID: "booking-001",
-		},
-		{
-			name:            "Получение бронирований другого пользователя",
-			userID:          "user-456",
-			expectedCount:   2,
-			expectedFirstID: "booking-001",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Получаем бронирования пользователя
-			bookings, err := GetUserBookings(tt.userID)
-
-			// Проверяем результат
-			assert.NoError(t, err)
-			assert.Len(t, bookings, tt.expectedCount)
-
-			if tt.expectedCount > 0 {
-				// Проверяем первую запись
-				assert.Equal(t, tt.expectedFirstID, bookings[0].ID)
-				assert.Equal(t, tt.userID, bookings[0].UserID)
-				assert.NotEmpty(t, bookings[0].FlightID)
-				assert.NotEmpty(t, bookings[0].Class)
-				assert.Greater(t, bookings[0].TotalCost, 0.0)
-				assert.Equal(t, "confirmed", bookings[0].Status)
-				assert.NotEmpty(t, bookings[0].CreatedAt)
-
-				// Проверяем вторую запись (если есть)
-				if len(bookings) > 1 {
-					assert.Equal(t, "booking-002", bookings[1].ID)
-					assert.Equal(t, "business", bookings[1].Class)
-					assert.Equal(t, 25000.0, bookings[1].TotalCost)
-				}
-			}
-		})
-	}
-}
-
-func TestCancelBooking(t *testing.T) {
-	tests := []struct {
-		name        string
-		bookingID   string
-		expectError bool
-	}{
-		{
-			name:        "Успешная отмена бронирования",
-			bookingID:   "booking-123",
-			expectError: false,
-		},
-		{
-			name:        "Отмена несуществующего бронирования",
-			bookingID:   "non-existent-booking",
-			expectError: false, // Текущая реализация всегда возвращает nil
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Выполняем отмену бронирования
-			err := CancelBooking(tt.bookingID)
-
-			// Проверяем результат
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestCalculateTotalCost(t *testing.T) {
-	tests := []struct {
-		name     string
-		flightID string
-		seats    int
-		class    string
-		expected float64
-	}{
-		{
-			name:     "Economy класс, 1 место",
-			flightID: "TEST-001",
-			seats:    1,
-			class:    "economy",
-			expected: 5000.0,
-		},
-		{
-			name:     "Economy класс, 3 места",
-			flightID: "TEST-002",
-			seats:    3,
-			class:    "economy",
-			expected: 15000.0,
-		},
-		{
-			name:     "Business класс, 1 место",
-			flightID: "TEST-003",
-			seats:    1,
-			class:    "business",
-			expected: 15000.0,
-		},
-		{
-			name:     "Business класс, 2 места",
-			flightID: "TEST-004",
-			seats:    2,
-			class:    "business",
-			expected: 30000.0,
-		},
-		{
-			name:     "First класс, 1 место",
-			flightID: "TEST-005",
-			seats:    1,
-			class:    "first",
-			expected: 30000.0,
-		},
-		{
-			name:     "First класс, 4 места",
-			flightID: "TEST-006",
-			seats:    4,
-			class:    "first",
-			expected: 120000.0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := calculateTotalCost(tt.flightID, tt.seats, tt.class)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestGenerateID(t *testing.T) {
-	// Тестируем генерацию ID
-	id1 := generateID()
-	id2 := generateID()
-
-	// Проверяем, что ID не пустые и разные
-	assert.NotEmpty(t, id1)
-	assert.NotEmpty(t, id2)
-	assert.NotEqual(t, id1, id2)
-
-	// Проверяем формат ID (должен быть в формате YYYYMMDDHHMMSS)
-	assert.Len(t, id1, 14)
-
-	// Пытаемся распарсить как дату
-	_, err := time.Parse("20060102150405", id1)
-	assert.NoError(t, err)
 }
 
 // Интеграционный тест полного потока бронирования
-func TestBookingFlow(t *testing.T) {
-	// Шаг 1: Создание бронирования
-	booking, err := CreateBooking("SU-9999", "test-user", 2, "economy")
-	assert.NoError(t, err)
-	assert.NotNil(t, booking)
-	assert.Equal(t, "confirmed", booking.Status)
+func (suite *BookingServiceTestSuite) TestBookingFlow() {
+	// Шаг 1: Создаем пользователя и рейс
+	user := models.User{
+		Name:  "Integration Test User",
+		Email: "integration@example.com",
+	}
+	suite.db.Create(&user)
 
-	// Шаг 2: Получение бронирований пользователя
-	bookings, err := GetUserBookings("test-user")
-	assert.NoError(t, err)
-	assert.Greater(t, len(bookings), 0)
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "Sochi",
+		Price:          8000.0,
+		AvailableSeats: 50,
+	}
+	suite.db.Create(&flight)
 
-	// Шаг 3: Отмена бронирования
+	// Шаг 2: Создаем бронирование
+	booking, err := CreateBooking(flight.ID, user.ID, 3, "business")
+	suite.NoError(err)
+	suite.NotNil(booking)
+	suite.Equal("confirmed", booking.Status)
+
+	// Шаг 3: Получаем бронирования пользователя
+	bookings, err := GetUserBookings(user.ID)
+	suite.NoError(err)
+	suite.Len(bookings, 1)
+	suite.Equal(booking.ID, bookings[0].ID)
+
+	// Шаг 4: Отменяем бронирование
 	err = CancelBooking(booking.ID)
-	assert.NoError(t, err)
+	suite.NoError(err)
+
+	// Проверяем, что статус изменился и места вернулись
+	var cancelledBooking models.Booking
+	suite.db.First(&cancelledBooking, booking.ID)
+	suite.Equal("cancelled", cancelledBooking.Status)
+
+	var updatedFlight models.Flight
+	suite.db.First(&updatedFlight, flight.ID)
+	suite.Equal(50, updatedFlight.AvailableSeats)
 }
