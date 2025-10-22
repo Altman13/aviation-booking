@@ -1,114 +1,91 @@
 package services
 
-import (
-	"aviation-booking/config" // импортируем конфиг
-	"aviation-booking/models" // импортируем модель данных
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-)
+import "time"
 
-// Структура для получения данных о рейсах
-type FlightOffer struct {
-	ID        string `json:"id"`
-	Departure struct {
-		AirportCode string `json:"iataCode"`
-		DateTime    string `json:"at"`
-	} `json:"departure"`
-	Arrival struct {
-		AirportCode string `json:"iataCode"`
-		DateTime    string `json:"at"`
-	} `json:"arrival"`
-	Price struct {
-		Currency string `json:"currency"`
-		Total    string `json:"total"`
-	} `json:"price"`
+// Booking представляет информацию о бронировании
+type Booking struct {
+	ID        string  `json:"id"`
+	FlightID  string  `json:"flight_id"`
+	UserID    string  `json:"user_id"`
+	Seats     int     `json:"seats"`
+	Class     string  `json:"class"`
+	TotalCost float64 `json:"total_cost"`
+	Status    string  `json:"status"`
+	CreatedAt string  `json:"created_at"`
 }
 
-// Структура ответа от API Amadeus
-type FlightResponse struct {
-	Data []FlightOffer `json:"data"`
+// CreateBooking - создание нового бронирования
+func CreateBooking(flightID, userID string, seats int, class string) (*Booking, error) {
+	// Если класс не указан, используем economy по умолчанию
+	if class == "" {
+		class = "economy"
+	}
+
+	// Временная заглушка - в реальном приложении здесь будет логика работы с БД
+	booking := &Booking{
+		ID:        "booking-" + generateID(),
+		FlightID:  flightID,
+		UserID:    userID,
+		Seats:     seats,
+		Class:     class,
+		TotalCost: calculateTotalCost(flightID, seats, class),
+		Status:    "confirmed",
+		CreatedAt: time.Now().Format(time.RFC3339),
+	}
+
+	return booking, nil
 }
 
-// Функция для получения рейсов из Amadeus API
-func GetFlightsFromAmadeus(origin, destination, departureDate string) ([]FlightOffer, error) {
-	// Формируем URL для запроса
-	url := fmt.Sprintf("https://api.amadeus.com/v2/shopping/flight-offers?origin=%s&destination=%s&departureDate=%s", origin, destination, departureDate)
-
-	// Отправляем запрос с авторизацией
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+// GetUserBookings - получение бронирований пользователя
+func GetUserBookings(userID string) ([]Booking, error) {
+	// Временная заглушка - в реальном приложении здесь будет запрос к БД
+	bookings := []Booking{
+		{
+			ID:        "booking-001",
+			FlightID:  "SU-1234",
+			UserID:    userID,
+			Seats:     2,
+			Class:     "economy",
+			TotalCost: 10000.00,
+			Status:    "confirmed",
+			CreatedAt: "2024-01-15T12:00:00Z",
+		},
+		{
+			ID:        "booking-002",
+			FlightID:  "S7-5678",
+			UserID:    userID,
+			Seats:     1,
+			Class:     "business",
+			TotalCost: 25000.00,
+			Status:    "confirmed",
+			CreatedAt: "2024-01-16T14:30:00Z",
+		},
 	}
 
-	// Добавляем заголовок с API ключом
-	req.Header.Add("Authorization", "Bearer "+config.AmadeusAPIKey)
-
-	// Выполняем запрос
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// Проверка на успешный ответ
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get data: %s", resp.Status)
-	}
-
-	// Чтение тела ответа
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	// Десериализация ответа
-	var flightResp FlightResponse
-	err = json.Unmarshal(body, &flightResp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %v", err)
-	}
-
-	return flightResp.Data, nil
+	return bookings, nil
 }
 
-// BookFlight - сервис для создания бронирования
-func BookFlight(flight *models.Flight) error {
-	// Проверка доступных мест
-	if flight.AvailableSeats <= 0 {
-		return errors.New("No available seats")
-	}
+// CancelBooking - отмена бронирования
+func CancelBooking(bookingID string) error {
+	// Временная заглушка - в реальном приложении здесь будет логика отмены в БД
+	// Проверяем существование бронирования и т.д.
 
-	// Создаем транзакцию
-	tx := config.DB.Begin()
-
-	// Убедимся, что транзакция правильно началась
-	if tx.Error != nil {
-		return tx.Error
-	}
-
-	// Создание бронирования
-	if err := flight.CreateFlight(tx); err != nil {
-		tx.Rollback() // Откатываем транзакцию в случае ошибки
-		return err
-	}
-
-	// Обновление количества доступных мест
-	flight.AvailableSeats--
-
-	// Обновляем рейс в базе данных в рамках транзакции
-	if err := tx.Save(flight).Error; err != nil {
-		tx.Rollback() // Откатываем транзакцию в случае ошибки
-		return err
-	}
-
-	// Подтверждаем транзакцию
-	if err := tx.Commit().Error; err != nil {
-		return err
-	}
-
+	// Симулируем успешную отмену
 	return nil
+}
+
+// Вспомогательные функции
+func generateID() string {
+	return time.Now().Format("20060102150405")
+}
+
+func calculateTotalCost(flightID string, seats int, class string) float64 {
+	// Временная логика расчета стоимости
+	basePrice := 5000.0
+	if class == "business" {
+		basePrice = 15000.0
+	} else if class == "first" {
+		basePrice = 30000.0
+	}
+	return basePrice * float64(seats)
 }

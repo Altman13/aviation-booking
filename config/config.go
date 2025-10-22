@@ -9,7 +9,7 @@ import (
 
 var (
 	DB_USER       = getEnv("DB_USER", "root")
-	DB_PASSWORD   = getEnv("DB_PASSWORD", "root")
+	DB_PASSWORD   = getEnv("DB_PASSWORD", "")
 	DB_NAME       = getEnv("DB_NAME", "aviation_booking")
 	DB_HOST       = getEnv("DB_HOST", "127.0.0.1")
 	DB_PORT       = getEnv("DB_PORT", "3306")
