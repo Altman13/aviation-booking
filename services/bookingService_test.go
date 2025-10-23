@@ -36,8 +36,8 @@ func TestBookingServiceSuite(t *testing.T) {
 func (suite *BookingServiceTestSuite) TestCreateBooking_Success() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -70,8 +70,8 @@ func (suite *BookingServiceTestSuite) TestCreateBooking_Success() {
 func (suite *BookingServiceTestSuite) TestCreateBooking_NotEnoughSeats() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -99,8 +99,8 @@ func (suite *BookingServiceTestSuite) TestCreateBooking_NotEnoughSeats() {
 func (suite *BookingServiceTestSuite) TestCreateBooking_FlightNotFound() {
 	// Создаем только пользователя
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -133,8 +133,8 @@ func (suite *BookingServiceTestSuite) TestCreateBooking_UserNotFound() {
 func (suite *BookingServiceTestSuite) TestCreateBooking_DefaultClass() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -157,8 +157,8 @@ func (suite *BookingServiceTestSuite) TestCreateBooking_DefaultClass() {
 func (suite *BookingServiceTestSuite) TestGetUserBookings_Success() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -214,8 +214,8 @@ func (suite *BookingServiceTestSuite) TestGetUserBookings_UserNotFound() {
 func (suite *BookingServiceTestSuite) TestCancelBooking_Success() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -256,8 +256,8 @@ func (suite *BookingServiceTestSuite) TestCancelBooking_Success() {
 func (suite *BookingServiceTestSuite) TestCancelBooking_AlreadyCancelled() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -297,8 +297,8 @@ func (suite *BookingServiceTestSuite) TestCancelBooking_NotFound() {
 func (suite *BookingServiceTestSuite) TestGetBookingByID_Success() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -341,8 +341,8 @@ func (suite *BookingServiceTestSuite) TestGetBookingByID_NotFound() {
 func (suite *BookingServiceTestSuite) TestUpdateBooking_Success() {
 	// Создаем тестовые данные
 	user := models.User{
-		Name:  "Test User",
-		Email: "test@example.com",
+		FirstName: "Test User",
+		Email:     "test@example.com",
 	}
 	suite.db.Create(&user)
 
@@ -450,8 +450,8 @@ func (suite *BookingServiceTestSuite) TestCalculateTotalCost() {
 func (suite *BookingServiceTestSuite) TestBookingFlow() {
 	// Шаг 1: Создаем пользователя и рейс
 	user := models.User{
-		Name:  "Integration Test User",
-		Email: "integration@example.com",
+		FirstName: "Integration Test User",
+		Email:     "integration@example.com",
 	}
 	suite.db.Create(&user)
 

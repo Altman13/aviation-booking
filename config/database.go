@@ -9,62 +9,101 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB // Основная база данных
+var DB *gorm.DB     // Основная база данных
+var TestDB *gorm.DB // Переменная для тестовой базы данных
 
 // InitDB инициализирует подключение к основной базе данных MySQL
-func InitDB() {
+func InitDB() error {
 	var err error
-	//fmt.Println("initDb")
-	// Строка подключения к MySQL (формат: user:password@tcp(host:port)/dbname)
+
+	// Строка подключения к MySQL
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
 		DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Could not connect to database: %v", err)
+		return fmt.Errorf("could not connect to database: %v", err)
 	}
 
 	// Автогенерация таблиц
-	if err := DB.AutoMigrate(&models.Flight{}); err != nil {
-		log.Fatalf("Could not migrate database: %v", err)
+	if err := DB.AutoMigrate(
+		&models.User{},
+		&models.Airport{},
+		&models.Airline{},
+		&models.Flight{},
+		&models.Booking{},
+		&models.Ticket{},
+	); err != nil {
+		return fmt.Errorf("could not migrate database: %v", err)
 	}
+
+	log.Println("Database connected and migrated successfully")
+	return nil
 }
 
-// CloseDB закрывает соединение с основной базой данных
-func CloseDB() {
-	sqlDB, err := DB.DB()
-	if err != nil {
-		log.Fatalf("Failed to get raw SQL database object: %v", err)
-	}
-	if err := sqlDB.Close(); err != nil {
-		log.Fatalf("Could not close database connection: %v", err)
-	}
-}
-
-var TestDB *gorm.DB // Переменная для тестовой базы данных
-func InitTestDB() {
+// InitTestDB инициализирует тестовую базу данных и возвращает ошибку
+func InitTestDB() error {
 	var err error
 
 	// Строка подключения к тестовой базе данных MySQL
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s_test?charset=utf8&parseTime=True&loc=Local",
 		DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+
 	TestDB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Could not connect to test database: %v", err)
+		return fmt.Errorf("could not connect to test database: %v", err)
 	}
 
 	// Автогенерация таблиц для тестов
-	if err := TestDB.AutoMigrate(&models.Flight{}); err != nil {
-		log.Fatalf("Could not migrate test database: %v", err)
+	if err := TestDB.AutoMigrate(
+		&models.User{},
+		&models.Airport{},
+		&models.Airline{},
+		&models.Flight{},
+		&models.Booking{},
+		&models.Ticket{},
+	); err != nil {
+		return fmt.Errorf("could not migrate test database: %v", err)
+	}
+
+	log.Println("Test database connected and migrated successfully")
+	return nil
+}
+
+// GetDB возвращает экземпляр основной базы данных
+func GetDB() *gorm.DB {
+	return DB
+}
+
+// GetTestDB возвращает экземпляр тестовой базы данных
+func GetTestDB() *gorm.DB {
+	return TestDB
+}
+
+// CloseDB закрывает соединение с основной базой данных
+func CloseDB() {
+	if DB != nil {
+		sqlDB, err := DB.DB()
+		if err != nil {
+			log.Printf("Failed to get raw SQL database object: %v", err)
+			return
+		}
+		if err := sqlDB.Close(); err != nil {
+			log.Printf("Could not close database connection: %v", err)
+		}
 	}
 }
 
 // CloseTestDB закрывает соединение с тестовой базой данных
 func CloseTestDB() {
-	sqlDB, err := TestDB.DB()
-	if err != nil {
-		log.Fatalf("Failed to get raw SQL database object: %v", err)
-	}
-	if err := sqlDB.Close(); err != nil {
-		log.Fatalf("Failed to close connection: %v", err)
+	if TestDB != nil {
+		sqlDB, err := TestDB.DB()
+		if err != nil {
+			log.Printf("Failed to get raw SQL database object: %v", err)
+			return
+		}
+		if err := sqlDB.Close(); err != nil {
+			log.Printf("Failed to close connection: %v", err)
+		}
 	}
 }

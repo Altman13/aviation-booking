@@ -7,15 +7,19 @@ import (
 )
 
 type Booking struct {
-	ID         uint      `json:"id" gorm:"primaryKey"`
-	FlightID   uint      `json:"flight_id" binding:"required"`
-	UserID     uint      `json:"user_id" binding:"required"`
-	Seats      int       `json:"seats" binding:"required,min=1"`
-	Class      string    `json:"class" binding:"required"`
-	Status     string    `json:"status" gorm:"default:confirmed"`
-	TotalPrice float64   `json:"total_price"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	FlightID      uint      `json:"flight_id" binding:"required"`
+	UserID        uint      `json:"user_id" binding:"required"`
+	Seats         int       `json:"seats" binding:"required,min=1"`
+	Class         string    `json:"class" binding:"required"`
+	Status        string    `json:"status" gorm:"default:confirmed"`
+	TotalPrice    float64   `json:"total_price"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	BookingID     string    `json:"booking_id" faker:"-"`
+	BookingDate   time.Time `json:"booking_date"`
+	TotalAmount   float64   `json:"total_amount"`
+	PaymentStatus string    `json:"payment_status"`
 
 	// Связи (опционально, для eager loading)
 	Flight Flight `json:"flight" gorm:"foreignKey:FlightID"`

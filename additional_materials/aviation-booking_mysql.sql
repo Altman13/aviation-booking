@@ -92,3 +92,11 @@ CREATE TABLE user_favorites (
     FOREIGN KEY (destination_airport_id) REFERENCES airports(id),
     UNIQUE KEY unique_user_favorite (user_id, origin_airport_id, destination_airport_id)
 );
+
+-- Индексы для оптимизации
+CREATE INDEX idx_airports_iata ON airports(iata_code);
+CREATE INDEX idx_airlines_iata ON airlines(iata_code);
+CREATE INDEX idx_flights_departure ON flights(departure_utc);
+CREATE INDEX idx_flights_price ON flights(price);
+CREATE INDEX idx_searches_dates ON searches(departure_date, return_date);
+CREATE INDEX idx_price_history_recorded ON price_history(recorded_at);
