@@ -1,0 +1,54 @@
+.filters {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.filters__section {
+    margin-bottom: 25px;
+}
+
+.filters__section:last-child {
+    margin-bottom: 0;
+}
+
+.filters__title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.filters__options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filters__option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-radius: 4px;
+    padding: 8px 12px;
+}
+
+.filters__option:hover {
+    background: #f8f9fa;
+}
+
+.filters__checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.filters__label {
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+}
