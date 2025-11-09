@@ -90,3 +90,4 @@ CREATE TABLE user_favorites (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, origin_airport_id, destination_airport_id) -- Чтобы не дублировать
 );
+

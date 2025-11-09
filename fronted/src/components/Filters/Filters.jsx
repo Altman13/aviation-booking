@@ -7,7 +7,7 @@ const Filters = ({ filters, onFiltersChange }) => {
     const newStops = filters.stops.includes(stopCount)
       ? filters.stops.filter(s => s !== stopCount)
       : [...filters.stops, stopCount];
-    
+
     onFiltersChange({
       ...filters,
       stops: newStops
@@ -28,15 +28,15 @@ const Filters = ({ filters, onFiltersChange }) => {
                 className="filters__checkbox"
               />
               <span className="filters__label">
-                {stopCount === 0 ? 'Без пересадок' : 
-                 stopCount === 1 ? '1 пересадка' : 
-                 `${stopCount} пересадки`}
+                {stopCount === 0 ? 'Без пересадок' :
+                  stopCount === 1 ? '1 пересадка' :
+                    `${stopCount} пересадки`}
               </span>
             </label>
           ))}
         </div>
       </div>
-      
+
       <div className="filters__section">
         <h3 className="filters__title">Авиакомпании</h3>
         <div className="filters__options">
