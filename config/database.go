@@ -10,19 +10,28 @@ import (
 )
 
 var DB *gorm.DB     // Основная база данных
-var TestDB *gorm.DB // Переменная для тестовой базы данных
+var TestDB *gorm.DB // Тестовая база данных
 
 // InitDB инициализирует подключение к основной базе данных MySQL
 func InitDB() error {
 	var err error
 
-	// Строка подключения к MySQL
+	// Получаем значения из config/config.go
+	dbUser := GetEnv("DB_USER", "root")
+	dbPassword := GetEnv("DB_PASSWORD", "")
+	dbHost := GetEnv("DB_HOST", "127.0.0.1")
+	dbPort := GetEnv("DB_PORT", "3306")
+	dbName := GetEnv("DB_NAME", "aviation_booking")
+
+	// Строка подключения к основной базе данных
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
-		DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+		dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	log.Printf("Connecting to MAIN database: %s@%s:%s/%s", dbUser, dbHost, dbPort, dbName)
 
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return fmt.Errorf("could not connect to database: %v", err)
+		return fmt.Errorf("could not connect to main database: %v", err)
 	}
 
 	// Автогенерация таблиц
@@ -34,20 +43,30 @@ func InitDB() error {
 		&models.Booking{},
 		&models.Ticket{},
 	); err != nil {
-		return fmt.Errorf("could not migrate database: %v", err)
+		return fmt.Errorf("could not migrate main database: %v", err)
 	}
 
-	log.Println("Database connected and migrated successfully")
+	log.Println("✅ Main database connected and migrated successfully")
 	return nil
 }
 
-// InitTestDB инициализирует тестовую базу данных и возвращает ошибку
+// InitTestDB инициализирует тестовую базу данных
 func InitTestDB() error {
 	var err error
 
-	// Строка подключения к тестовой базе данных MySQL
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s_test?charset=utf8&parseTime=True&loc=Local",
-		DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
+	// Получаем значения из config/config.go
+	dbUser := GetEnv("DB_USER", "root")
+	dbPassword := GetEnv("DB_PASSWORD", "")
+	dbHost := GetEnv("DB_HOST", "127.0.0.1")
+	dbPort := GetEnv("DB_PORT", "3306")
+	dbName := GetEnv("DB_NAME", "aviation_booking")
+	testDBName := dbName + "_test"
+
+	// Строка подключения к тестовой базе данных
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local",
+		dbUser, dbPassword, dbHost, dbPort, testDBName)
+
+	log.Printf("Connecting to TEST database: %s@%s:%s/%s", dbUser, dbHost, dbPort, testDBName)
 
 	TestDB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -66,7 +85,7 @@ func InitTestDB() error {
 		return fmt.Errorf("could not migrate test database: %v", err)
 	}
 
-	log.Println("Test database connected and migrated successfully")
+	log.Println("✅ Test database connected and migrated successfully")
 	return nil
 }
 
@@ -89,7 +108,9 @@ func CloseDB() {
 			return
 		}
 		if err := sqlDB.Close(); err != nil {
-			log.Printf("Could not close database connection: %v", err)
+			log.Printf("Could not close main database connection: %v", err)
+		} else {
+			log.Println("Main database connection closed")
 		}
 	}
 }
@@ -103,7 +124,9 @@ func CloseTestDB() {
 			return
 		}
 		if err := sqlDB.Close(); err != nil {
-			log.Printf("Failed to close connection: %v", err)
+			log.Printf("Could not close test database connection: %v", err)
+		} else {
+			log.Println("Test database connection closed")
 		}
 	}
 }

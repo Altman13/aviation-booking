@@ -4,6 +4,7 @@ import (
 	"aviation-booking/config"
 	"aviation-booking/models"
 	"errors"
+	"time"
 )
 
 // CreateBooking - создание нового бронирования
@@ -33,16 +34,20 @@ func CreateBooking(flightID, userID uint, seats int, class string) (*models.Book
 	}
 
 	// Рассчитываем общую стоимость
-	totalPrice := calculateTotalCost(flight.Price, seats, class)
+	totalAmount := calculateTotalCost(flight.Price, seats, class)
 
-	// Создаем бронирование
+	// Создаем бронирование с правильными полями
 	booking := &models.Booking{
-		FlightID:   flightID,
-		UserID:     userID,
-		Seats:      seats,
-		Class:      class,
-		TotalPrice: totalPrice,
-		Status:     "confirmed",
+		UserID:        userID,
+		FlightID:      flightID,
+		Seats:         seats,
+		Class:         class,
+		BookingDate:   time.Now(),
+		TotalAmount:   totalAmount,
+		Status:        "confirmed",
+		PaymentStatus: "paid",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	// Начинаем транзакцию вручную
@@ -178,7 +183,8 @@ func UpdateBooking(bookingID uint, seats int, class string) (*models.Booking, er
 	// Обновляем данные бронирования
 	booking.Seats = seats
 	booking.Class = class
-	booking.TotalPrice = calculateTotalCost(flight.Price, seats, class)
+	booking.TotalAmount = calculateTotalCost(flight.Price, seats, class)
+	booking.UpdatedAt = time.Now()
 
 	if err := tx.Save(&booking).Error; err != nil {
 		tx.Rollback()

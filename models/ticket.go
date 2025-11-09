@@ -4,7 +4,7 @@ import "time"
 
 type Ticket struct {
 	ID            uint      `json:"id"`
-	BookingID     string    `json:"booking_id"`
+	BookingID     uint      `json:"booking_id"`
 	PassengerName string    `json:"passenger_name"`
 	FlightID      uint      `json:"flight_id"`
 	SeatNumber    string    `json:"seat_number"`

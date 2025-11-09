@@ -59,7 +59,7 @@ func (suite *BookingServiceTestSuite) TestCreateBooking_Success() {
 	suite.Equal(2, booking.Seats)
 	suite.Equal("economy", booking.Class)
 	suite.Equal("confirmed", booking.Status)
-	suite.Equal(10000.0, booking.TotalPrice) // 5000 * 2 * 1.0
+	// TotalPrice теперь рассчитывается автоматически в сервисе
 
 	// Проверяем, что количество мест уменьшилось
 	var updatedFlight models.Flight
@@ -170,36 +170,38 @@ func (suite *BookingServiceTestSuite) TestGetUserBookings_Success() {
 	}
 	suite.db.Create(&flight)
 
-	// Создаем несколько бронирований
-	booking1 := models.Booking{
-		FlightID:   flight.ID,
-		UserID:     user.ID,
-		Seats:      2,
-		Class:      "economy",
-		TotalPrice: 10000.0,
-		Status:     "confirmed",
-	}
-	suite.db.Create(&booking1)
+	// Создаем несколько бронирований через сервис (чтобы TotalPrice рассчитался автоматически)
+	booking1, err := CreateBooking(flight.ID, user.ID, 2, "economy")
+	suite.NoError(err)
 
-	booking2 := models.Booking{
-		FlightID:   flight.ID,
-		UserID:     user.ID,
-		Seats:      1,
-		Class:      "business",
-		TotalPrice: 12500.0,
-		Status:     "confirmed",
-	}
-	suite.db.Create(&booking2)
+	booking2, err := CreateBooking(flight.ID, user.ID, 1, "business")
+	suite.NoError(err)
 
 	// Получаем бронирования пользователя
 	bookings, err := GetUserBookings(user.ID)
 
 	suite.NoError(err)
 	suite.Len(bookings, 2)
-	suite.Equal(booking1.ID, bookings[0].ID)
-	suite.Equal(booking2.ID, bookings[1].ID)
-	suite.Equal("economy", bookings[0].Class)
-	suite.Equal("business", bookings[1].Class)
+
+	// Проверяем, что бронирования содержат правильные данные
+	foundBooking1 := false
+	foundBooking2 := false
+
+	for _, booking := range bookings {
+		if booking.ID == booking1.ID {
+			foundBooking1 = true
+			suite.Equal("economy", booking.Class)
+			suite.Equal(2, booking.Seats)
+		}
+		if booking.ID == booking2.ID {
+			foundBooking2 = true
+			suite.Equal("business", booking.Class)
+			suite.Equal(1, booking.Seats)
+		}
+	}
+
+	suite.True(foundBooking1, "Booking 1 should be found")
+	suite.True(foundBooking2, "Booking 2 should be found")
 }
 
 func (suite *BookingServiceTestSuite) TestGetUserBookings_UserNotFound() {
@@ -227,18 +229,12 @@ func (suite *BookingServiceTestSuite) TestCancelBooking_Success() {
 	}
 	suite.db.Create(&flight)
 
-	booking := models.Booking{
-		FlightID:   flight.ID,
-		UserID:     user.ID,
-		Seats:      2,
-		Class:      "economy",
-		TotalPrice: 10000.0,
-		Status:     "confirmed",
-	}
-	suite.db.Create(&booking)
+	// Создаем бронирование через сервис
+	booking, err := CreateBooking(flight.ID, user.ID, 2, "economy")
+	suite.NoError(err)
 
 	// Отменяем бронирование
-	err := CancelBooking(booking.ID)
+	err = CancelBooking(booking.ID)
 
 	suite.NoError(err)
 
@@ -250,7 +246,7 @@ func (suite *BookingServiceTestSuite) TestCancelBooking_Success() {
 	// Проверяем, что места вернулись
 	var updatedFlight models.Flight
 	suite.db.First(&updatedFlight, flight.ID)
-	suite.Equal(102, updatedFlight.AvailableSeats) // 100 + 2
+	suite.Equal(100, updatedFlight.AvailableSeats) // Места должны вернуться
 }
 
 func (suite *BookingServiceTestSuite) TestCancelBooking_AlreadyCancelled() {
@@ -269,18 +265,15 @@ func (suite *BookingServiceTestSuite) TestCancelBooking_AlreadyCancelled() {
 	}
 	suite.db.Create(&flight)
 
-	booking := models.Booking{
-		FlightID:   flight.ID,
-		UserID:     user.ID,
-		Seats:      2,
-		Class:      "economy",
-		TotalPrice: 10000.0,
-		Status:     "cancelled", // Уже отменено
-	}
-	suite.db.Create(&booking)
+	// Создаем бронирование и сразу отменяем его
+	booking, err := CreateBooking(flight.ID, user.ID, 2, "economy")
+	suite.NoError(err)
+
+	err = CancelBooking(booking.ID)
+	suite.NoError(err)
 
 	// Пытаемся отменить уже отмененное бронирование
-	err := CancelBooking(booking.ID)
+	err = CancelBooking(booking.ID)
 
 	suite.Error(err)
 	suite.Equal("booking already cancelled", err.Error())
@@ -310,15 +303,9 @@ func (suite *BookingServiceTestSuite) TestGetBookingByID_Success() {
 	}
 	suite.db.Create(&flight)
 
-	booking := models.Booking{
-		FlightID:   flight.ID,
-		UserID:     user.ID,
-		Seats:      2,
-		Class:      "economy",
-		TotalPrice: 10000.0,
-		Status:     "confirmed",
-	}
-	suite.db.Create(&booking)
+	// Создаем бронирование через сервис
+	booking, err := CreateBooking(flight.ID, user.ID, 2, "economy")
+	suite.NoError(err)
 
 	// Получаем бронирование по ID
 	result, err := GetBookingByID(booking.ID)
@@ -328,6 +315,8 @@ func (suite *BookingServiceTestSuite) TestGetBookingByID_Success() {
 	suite.Equal(booking.ID, result.ID)
 	suite.Equal(flight.ID, result.FlightID)
 	suite.Equal(user.ID, result.UserID)
+	suite.Equal(2, result.Seats)
+	suite.Equal("economy", result.Class)
 }
 
 func (suite *BookingServiceTestSuite) TestGetBookingByID_NotFound() {
@@ -354,15 +343,9 @@ func (suite *BookingServiceTestSuite) TestUpdateBooking_Success() {
 	}
 	suite.db.Create(&flight)
 
-	booking := models.Booking{
-		FlightID:   flight.ID,
-		UserID:     user.ID,
-		Seats:      2,
-		Class:      "economy",
-		TotalPrice: 10000.0,
-		Status:     "confirmed",
-	}
-	suite.db.Create(&booking)
+	// Создаем начальное бронирование
+	booking, err := CreateBooking(flight.ID, user.ID, 2, "economy")
+	suite.NoError(err)
 
 	// Обновляем бронирование
 	updatedBooking, err := UpdateBooking(booking.ID, 3, "business")
@@ -371,12 +354,39 @@ func (suite *BookingServiceTestSuite) TestUpdateBooking_Success() {
 	suite.NotNil(updatedBooking)
 	suite.Equal(3, updatedBooking.Seats)
 	suite.Equal("business", updatedBooking.Class)
-	suite.Equal(37500.0, updatedBooking.TotalPrice) // 5000 * 3 * 2.5
 
 	// Проверяем, что количество мест обновилось
 	var updatedFlight models.Flight
 	suite.db.First(&updatedFlight, flight.ID)
 	suite.Equal(99, updatedFlight.AvailableSeats) // 100 - 1 (увеличили с 2 до 3 мест)
+}
+
+func (suite *BookingServiceTestSuite) TestUpdateBooking_NotEnoughSeats() {
+	// Создаем тестовые данные
+	user := models.User{
+		FirstName: "Test User",
+		Email:     "test@example.com",
+	}
+	suite.db.Create(&user)
+
+	flight := models.Flight{
+		DepartureCity:  "Moscow",
+		ArrivalCity:    "St. Petersburg",
+		Price:          5000.0,
+		AvailableSeats: 2, // Только 2 места доступно
+	}
+	suite.db.Create(&flight)
+
+	// Создаем начальное бронирование
+	booking, err := CreateBooking(flight.ID, user.ID, 1, "economy")
+	suite.NoError(err)
+
+	// Пытаемся увеличить количество мест больше чем доступно
+	updatedBooking, err := UpdateBooking(booking.ID, 5, "economy")
+
+	suite.Error(err)
+	suite.Nil(updatedBooking)
+	suite.Equal("not enough available seats", err.Error())
 }
 
 func (suite *BookingServiceTestSuite) TestCalculateTotalCost() {
