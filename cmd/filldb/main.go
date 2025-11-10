@@ -41,31 +41,39 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to generate users:", err)
 	}
-	if err := insertUsers(db, users); err != nil {
+	// Сохраняем пользователей и получаем их с ID
+	savedUsers, err := insertAndGetUsers(db, users)
+	if err != nil {
 		log.Fatal("Failed to insert users:", err)
 	}
-	fmt.Printf("✅ Inserted %d users\n", len(users))
+	fmt.Printf("✅ Inserted %d users\n", len(savedUsers))
 
 	airports := generator.GenerateAirports()
-	if err := insertAirports(db, airports); err != nil {
+	// Сохраняем аэропорты и получаем их с ID
+	savedAirports, err := insertAndGetAirports(db, airports)
+	if err != nil {
 		log.Fatal("Failed to insert airports:", err)
 	}
-	fmt.Printf("✅ Inserted %d airports\n", len(airports))
+	fmt.Printf("✅ Inserted %d airports\n", len(savedAirports))
 
 	airlines := generator.GenerateAirlines()
-	if err := insertAirlines(db, airlines); err != nil {
+	// Сохраняем авиакомпании и получаем их с ID
+	savedAirlines, err := insertAndGetAirlines(db, airlines)
+	if err != nil {
 		log.Fatal("Failed to insert airlines:", err)
 	}
-	fmt.Printf("✅ Inserted %d airlines\n", len(airlines))
+	fmt.Printf("✅ Inserted %d airlines\n", len(savedAirlines))
 
-	flights := generator.GenerateFlights(200, airlines, airports)
-	if err := insertFlights(db, flights); err != nil {
+	flights := generator.GenerateFlights(200, savedAirlines, savedAirports)
+	// Сохраняем рейсы и получаем их с ID
+	savedFlights, err := insertAndGetFlights(db, flights)
+	if err != nil {
 		log.Fatal("Failed to insert flights:", err)
 	}
-	fmt.Printf("✅ Inserted %d flights\n", len(flights))
+	fmt.Printf("✅ Inserted %d flights\n", len(savedFlights))
 
 	// Генерируем и сохраняем бронирования, получая их ID
-	bookings := generateBookings(30, users, flights)
+	bookings := generateBookings(30, savedUsers, savedFlights)
 	savedBookings, err := insertAndGetBookings(db, bookings)
 	if err != nil {
 		log.Fatal("Failed to insert bookings:", err)
@@ -73,7 +81,7 @@ func main() {
 	fmt.Printf("✅ Inserted %d bookings\n", len(savedBookings))
 
 	// Теперь генерируем билеты с правильными booking.ID
-	tickets := generateTickets(savedBookings, flights, users)
+	tickets := generateTickets(savedBookings, savedFlights, savedUsers)
 	if err := insertTickets(db, tickets); err != nil {
 		log.Fatal("Failed to insert tickets:", err)
 	}
@@ -84,23 +92,93 @@ func main() {
 	fmt.Println("🚀 You can now run your application with: go run cmd/server/main.go")
 }
 
+// Вставка пользователей и возврат с ID
+func insertAndGetUsers(db *gorm.DB, users []models.User) ([]models.User, error) {
+	var savedUsers []models.User
+
+	for _, user := range users {
+		result := db.Create(&user)
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to insert user %s: %v", user.Email, result.Error)
+		}
+		// Добавляем пользователя с заполненным ID
+		savedUsers = append(savedUsers, user)
+	}
+
+	return savedUsers, nil
+}
+
+// Вставка аэропортов и возврат с ID
+func insertAndGetAirports(db *gorm.DB, airports []models.Airport) ([]models.Airport, error) {
+	var savedAirports []models.Airport
+
+	for _, airport := range airports {
+		result := db.Create(&airport)
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to insert airport %s: %v", airport.Code, result.Error)
+		}
+		// Добавляем аэропорт с заполненным ID
+		savedAirports = append(savedAirports, airport)
+	}
+
+	return savedAirports, nil
+}
+
+// Вставка авиакомпаний и возврат с ID
+func insertAndGetAirlines(db *gorm.DB, airlines []models.Airline) ([]models.Airline, error) {
+	var savedAirlines []models.Airline
+
+	for _, airline := range airlines {
+		result := db.Create(&airline)
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to insert airline %s: %v", airline.Code, result.Error)
+		}
+		// Добавляем авиакомпанию с заполненным ID
+		savedAirlines = append(savedAirlines, airline)
+	}
+
+	return savedAirlines, nil
+}
+
+// Вставка рейсов и возврат с ID
+func insertAndGetFlights(db *gorm.DB, flights []models.Flight) ([]models.Flight, error) {
+	var savedFlights []models.Flight
+
+	for _, flight := range flights {
+		result := db.Create(&flight)
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to insert flight %s: %v", flight.FlightNumber, result.Error)
+		}
+		// Добавляем рейс с заполненным ID
+		savedFlights = append(savedFlights, flight)
+	}
+
+	return savedFlights, nil
+}
+
 // Генерация бронирований
 func generateBookings(count int, users []models.User, flights []models.Flight) []models.Booking {
 	var bookings []models.Booking
 
 	bookingStatuses := []string{"confirmed", "pending", "cancelled"}
+	paymentStatuses := []string{"paid", "pending", "failed"}
 
 	for i := 0; i < count; i++ {
 		user := users[i%len(users)]
 		flight := flights[i%len(flights)]
 
+		// Генерируем случайное количество мест (1-4)
+		seats := 1 + (i % 4)
+		totalAmount := flight.Price * float64(seats)
+
 		booking := models.Booking{
 			UserID:        user.ID,
 			FlightID:      flight.ID,
+			Seats:         seats,
 			BookingDate:   user.CreatedAt,
-			TotalAmount:   float64(10000 + (i * 1000)),
+			TotalAmount:   totalAmount,
 			Status:        bookingStatuses[i%len(bookingStatuses)],
-			PaymentStatus: "paid",
+			PaymentStatus: paymentStatuses[i%len(paymentStatuses)],
 			CreatedAt:     user.CreatedAt,
 			UpdatedAt:     user.UpdatedAt,
 		}
@@ -132,18 +210,36 @@ func generateTickets(bookings []models.Booking, flights []models.Flight, users [
 
 	fareConditions := []string{"economy", "business", "first"}
 
-	for i, booking := range bookings {
-		// Создаем 1-3 билета для каждого бронирования
-		ticketCount := 1 + (i % 3)
-		for j := 0; j < ticketCount; j++ {
-			flight := flights[(i+j)%len(flights)]
+	for _, booking := range bookings {
+		// Создаем количество билетов равное количеству мест в бронировании
+		for j := 0; j < booking.Seats; j++ {
+			// Используем рейс из бронирования
+			flightID := booking.FlightID
+			var flight models.Flight
+			for _, f := range flights {
+				if f.ID == flightID {
+					flight = f
+					break
+				}
+			}
+
+			// Используем пользователя из бронирования
+			userID := booking.UserID
+			var user models.User
+			for _, u := range users {
+				if u.ID == userID {
+					user = u
+					break
+				}
+			}
+
 			ticket := models.Ticket{
-				BookingID:     booking.ID, // Теперь booking.ID должен быть установлен
-				PassengerName: fmt.Sprintf("%s %s", users[i%len(users)].FirstName, users[i%len(users)].LastName),
+				BookingID:     booking.ID,
+				PassengerName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
 				FlightID:      flight.ID,
 				SeatNumber:    fmt.Sprintf("%d%c", 10+(j*2), 'A'+j),
 				FareCondition: fareConditions[j%len(fareConditions)],
-				Price:         flight.Price * float64(j+1) * 0.8,
+				Price:         flight.Price,
 				CreatedAt:     booking.CreatedAt,
 				UpdatedAt:     booking.UpdatedAt,
 			}
@@ -156,6 +252,11 @@ func generateTickets(bookings []models.Booking, flights []models.Flight, users [
 
 // Очистка существующих данных
 func clearExistingData(db *gorm.DB) error {
+	// Отключаем проверку внешних ключей
+	if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+		return fmt.Errorf("failed to disable foreign key checks: %v", err)
+	}
+
 	tables := []string{"tickets", "bookings", "flights", "airlines", "airports", "users"}
 
 	for _, table := range tables {
@@ -168,6 +269,11 @@ func clearExistingData(db *gorm.DB) error {
 			}
 			return fmt.Errorf("failed to clear table %s: %v", table, result.Error)
 		}
+	}
+
+	// Включаем проверку внешних ключей обратно
+	if err := db.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
+		return fmt.Errorf("failed to enable foreign key checks: %v", err)
 	}
 
 	fmt.Println("✅ Cleared existing data")
@@ -192,50 +298,6 @@ func contains(s, substr string) bool {
 		}
 	}
 	return false
-}
-
-// Вставка пользователей
-func insertUsers(db *gorm.DB, users []models.User) error {
-	for _, user := range users {
-		result := db.Create(&user)
-		if result.Error != nil {
-			return fmt.Errorf("failed to insert user %s: %v", user.Email, result.Error)
-		}
-	}
-	return nil
-}
-
-// Вставка аэропортов
-func insertAirports(db *gorm.DB, airports []models.Airport) error {
-	for _, airport := range airports {
-		result := db.Create(&airport)
-		if result.Error != nil {
-			return fmt.Errorf("failed to insert airport %s: %v", airport.Code, result.Error)
-		}
-	}
-	return nil
-}
-
-// Вставка авиакомпаний
-func insertAirlines(db *gorm.DB, airlines []models.Airline) error {
-	for _, airline := range airlines {
-		result := db.Create(&airline)
-		if result.Error != nil {
-			return fmt.Errorf("failed to insert airline %s: %v", airline.Code, result.Error)
-		}
-	}
-	return nil
-}
-
-// Вставка рейсов
-func insertFlights(db *gorm.DB, flights []models.Flight) error {
-	for _, flight := range flights {
-		result := db.Create(&flight)
-		if result.Error != nil {
-			return fmt.Errorf("failed to insert flight %s: %v", flight.FlightNumber, result.Error)
-		}
-	}
-	return nil
 }
 
 // Вставка билетов
