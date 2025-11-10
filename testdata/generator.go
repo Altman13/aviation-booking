@@ -24,20 +24,25 @@ func NewTestDataGenerator() *TestDataGenerator {
 func (g *TestDataGenerator) GenerateUsers(count int) ([]models.User, error) {
 	users := make([]models.User, count)
 
-	// Русские имена и фамилии
-	firstNames := []string{
+	// Мужские имена
+	maleFirstNames := []string{
 		"Александр", "Алексей", "Андрей", "Антон", "Артем", "Борис", "Вадим", "Валентин",
 		"Валерий", "Виктор", "Виталий", "Владимир", "Вячеслав", "Геннадий", "Георгий",
 		"Денис", "Дмитрий", "Евгений", "Иван", "Игорь", "Кирилл", "Константин", "Максим",
 		"Михаил", "Никита", "Николай", "Олег", "Павел", "Петр", "Роман", "Сергей", "Станислав",
 		"Степан", "Юрий", "Ярослав",
+	}
+
+	// Женские имена
+	femaleFirstNames := []string{
 		"Александра", "Алена", "Алина", "Алла", "Анастасия", "Анна", "Валентина", "Валерия",
 		"Вера", "Виктория", "Галина", "Дарья", "Евгения", "Екатерина", "Елена", "Ирина",
 		"Ксения", "Лариса", "Любовь", "Людмила", "Марина", "Мария", "Надежда", "Наталья",
 		"Оксана", "Ольга", "Светлана", "Татьяна", "Юлия", "Яна",
 	}
 
-	lastNames := []string{
+	// Мужские фамилии
+	maleLastNames := []string{
 		"Иванов", "Петров", "Сидоров", "Смирнов", "Кузнецов", "Попов", "Лебедев", "Козлов",
 		"Новиков", "Морозов", "Волков", "Соловьев", "Васильев", "Зайцев", "Павлов",
 		"Семенов", "Голубев", "Виноградов", "Богданов", "Воробьев", "Федоров", "Михайлов",
@@ -45,16 +50,46 @@ func (g *TestDataGenerator) GenerateUsers(count int) ([]models.User, error) {
 		"Ковалев", "Ильин", "Гусев", "Титов", "Кузьмин", "Кудрявцев", "Баранов", "Куликов",
 		"Алексеев", "Степанов", "Яковлев", "Сорокин", "Сергеев", "Романов", "Захаров",
 		"Борисов", "Королев", "Герасимов", "Пономарев", "Григорьев",
+	}
+
+	// Женские фамилии
+	femaleLastNames := []string{
 		"Иванова", "Петрова", "Сидорова", "Смирнова", "Кузнецова", "Попова", "Лебедева",
 		"Козлова", "Новикова", "Морозова", "Волкова", "Соловьева", "Васильева", "Зайцева",
 		"Павлова", "Семенова", "Голубева", "Виноградова", "Богданова", "Воробьева",
+		"Федорова", "Михайлова", "Беляева", "Тарасова", "Белова", "Комарова", "Орлова",
+		"Киселева", "Макарова", "Андреева", "Ковалева", "Ильина", "Гусева", "Титова",
+		"Кузьмина", "Кудрявцева", "Баранова", "Куликова", "Алексеева", "Степанова",
+		"Яковлева", "Сорокина", "Сергеева", "Романова", "Захарова", "Борисова", "Королева",
+		"Герасимова", "Пономарева", "Григорьева",
 	}
 
 	domains := []string{"gmail.com", "yandex.ru", "mail.ru", "rambler.ru", "outlook.com", "yahoo.com"}
 
+	// Коды операторов для России
+	operators := []string{
+		"901", "902", "903", "904", "905", "906", "908", "909",
+		"910", "911", "912", "913", "914", "915", "916", "917", "918", "919",
+		"920", "921", "922", "923", "924", "925", "926", "927", "928", "929",
+		"930", "931", "932", "933", "934", "936", "937", "938", "939",
+		"950", "951", "952", "953", "954", "955", "956", "958", "959",
+		"960", "961", "962", "963", "964", "965", "966", "967", "968", "969",
+		"980", "981", "982", "983", "984", "985", "986", "987", "988", "989",
+	}
+
 	for i := 0; i < count; i++ {
-		firstName := firstNames[g.random.Intn(len(firstNames))]
-		lastName := lastNames[g.random.Intn(len(lastNames))]
+		// Случайно выбираем пол (50/50)
+		isMale := g.random.Intn(2) == 0
+
+		var firstName, lastName string
+		if isMale {
+			firstName = maleFirstNames[g.random.Intn(len(maleFirstNames))]
+			lastName = maleLastNames[g.random.Intn(len(maleLastNames))]
+		} else {
+			firstName = femaleFirstNames[g.random.Intn(len(femaleFirstNames))]
+			lastName = femaleLastNames[g.random.Intn(len(femaleLastNames))]
+		}
+
 		domain := domains[g.random.Intn(len(domains))]
 
 		// Создаем email на основе имени и фамилии
@@ -64,17 +99,29 @@ func (g *TestDataGenerator) GenerateUsers(count int) ([]models.User, error) {
 			g.random.Intn(1000),
 			domain)
 
+		// Генерируем телефонный номер в российском формате
+		operator := operators[g.random.Intn(len(operators))]
+		number := fmt.Sprintf("%07d", g.random.Intn(10000000))
+		phoneNumber := fmt.Sprintf("+7%s%s", operator, number)
+
+		// Генерируем дату рождения (от 18 до 70 лет)
+		years := 18 + g.random.Intn(52) // 18-70 лет
+		days := g.random.Intn(365)
+		dateOfBirth := time.Now().AddDate(-years, 0, -days)
+
 		// Нормализуем имена (первая буква заглавная, остальные строчные)
 		caser := cases.Title(language.Russian)
 		normalizedFirstName := caser.String(firstName)
 		normalizedLastName := caser.String(lastName)
 
 		users[i] = models.User{
-			FirstName: normalizedFirstName,
-			LastName:  normalizedLastName,
-			Email:     email,
-			CreatedAt: time.Now().Add(-time.Duration(g.random.Intn(365)) * 24 * time.Hour),
-			UpdatedAt: time.Now(),
+			FirstName:   normalizedFirstName,
+			LastName:    normalizedLastName,
+			Email:       email,
+			PhoneNumber: phoneNumber,
+			DateOfBirth: dateOfBirth,
+			CreatedAt:   time.Now().Add(-time.Duration(g.random.Intn(365)) * 24 * time.Hour),
+			UpdatedAt:   time.Now(),
 		}
 	}
 
