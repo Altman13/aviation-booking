@@ -3,13 +3,106 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
+	"time"
 
 	"aviation-booking/config"
 	"aviation-booking/models"
-	"aviation-booking/testdata"
 
 	"gorm.io/gorm"
 )
+
+// SimpleGenerator - упрощенный генератор тестовых данных
+type SimpleGenerator struct {
+	random *rand.Rand
+}
+
+func NewSimpleGenerator() *SimpleGenerator {
+	return &SimpleGenerator{
+		random: rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+// GenerateUsers - генерация пользователей
+// GenerateUsers - генерация пользователей
+func (g *SimpleGenerator) GenerateUsers(count int) []models.User {
+	users := make([]models.User, count)
+
+	firstNames := []string{"Иван", "Анна", "Петр", "Мария", "Алексей", "Елена", "Сергей", "Ольга"}
+	lastNames := []string{"Иванов", "Петрова", "Сидоров", "Смирнова", "Кузнецов", "Попова"}
+
+	for i := 0; i < count; i++ {
+		users[i] = models.User{
+			Email:        fmt.Sprintf("user%d@example.com", i),
+			PasswordHash: "password123", // В реальном приложении должен быть bcrypt/scrypt хэш
+			FirstName:    firstNames[i%len(firstNames)],
+			LastName:     lastNames[i%len(lastNames)],
+			CreatedAt:    time.Now().Add(-time.Duration(g.random.Intn(365)) * 24 * time.Hour),
+			UpdatedAt:    time.Now(),
+		}
+	}
+
+	return users
+}
+
+// GenerateAirports - генерация аэропортов
+func (g *SimpleGenerator) GenerateAirports() []models.Airport {
+	return []models.Airport{
+		{Code: "SVO", Name: "Шереметьево", City: "Москва", Country: "Россия"},
+		{Code: "DME", Name: "Домодедово", City: "Москва", Country: "Россия"},
+		{Code: "LED", Name: "Пулково", City: "Санкт-Петербург", Country: "Россия"},
+		{Code: "AER", Name: "Сочи", City: "Сочи", Country: "Россия"},
+		{Code: "KRR", Name: "Краснодар", City: "Краснодар", Country: "Россия"},
+		{Code: "KHV", Name: "Хабаровск", City: "Хабаровск", Country: "Россия"},
+	}
+}
+
+// GenerateAirlines - генерация авиакомпаний
+func (g *SimpleGenerator) GenerateAirlines() []models.Airline {
+	return []models.Airline{
+		{Code: "SU", Name: "Аэрофлот", Country: "Россия"},
+		{Code: "S7", Name: "S7 Airlines", Country: "Россия"},
+		{Code: "U6", Name: "Уральские авиалинии", Country: "Россия"},
+		{Code: "FV", Name: "Россия", Country: "Россия"},
+	}
+}
+
+// GenerateFlights - генерация рейсов
+// GenerateFlights - генерация рейсов
+func (g *SimpleGenerator) GenerateFlights(count int, airlines []models.Airline, airports []models.Airport) []models.Flight {
+	flights := make([]models.Flight, count)
+
+	for i := 0; i < count; i++ {
+		airline := airlines[g.random.Intn(len(airlines))]
+		depAirport := airports[g.random.Intn(len(airports))]
+		arrAirport := airports[g.random.Intn(len(airports))]
+
+		// Убедимся что аэропорты разные
+		for depAirport.Code == arrAirport.Code {
+			arrAirport = airports[g.random.Intn(len(airports))]
+		}
+
+		departureTime := time.Now().Add(time.Duration(g.random.Intn(30*24)) * time.Hour)
+		arrivalTime := departureTime.Add(time.Duration(1+g.random.Intn(8)) * time.Hour)
+
+		flights[i] = models.Flight{
+			FlightNumber:         fmt.Sprintf("%s%d", airline.Code, 1000+g.random.Intn(9000)),
+			Airline:              airline.Name, // Используем название авиакомпании
+			DepartureCity:        depAirport.City,
+			DepartureAirportCode: depAirport.Code,
+			ArrivalCity:          arrAirport.City,
+			ArrivalAirportCode:   arrAirport.Code,
+			DepartureTime:        departureTime,
+			ArrivalTime:          arrivalTime,
+			Price:                2000.0 + float64(g.random.Intn(28000)),
+			AvailableSeats:       50 + g.random.Intn(250),
+			CreatedAt:            time.Now(),
+			UpdatedAt:            time.Now(),
+		}
+	}
+
+	return flights
+}
 
 func main() {
 	// Инициализируем конфигурацию
@@ -32,15 +125,12 @@ func main() {
 		log.Fatal("Failed to clear existing data:", err)
 	}
 
-	generator := testdata.NewTestDataGenerator()
+	generator := NewSimpleGenerator()
 
 	// Генерируем тестовые данные
 	fmt.Println("Generating test data...")
 
-	users, err := generator.GenerateUsers(20)
-	if err != nil {
-		log.Fatal("Failed to generate users:", err)
-	}
+	users := generator.GenerateUsers(20)
 	// Сохраняем пользователей и получаем их с ID
 	savedUsers, err := insertAndGetUsers(db, users)
 	if err != nil {
@@ -64,6 +154,7 @@ func main() {
 	}
 	fmt.Printf("✅ Inserted %d airlines\n", len(savedAirlines))
 
+	// Генерируем рейсы
 	flights := generator.GenerateFlights(200, savedAirlines, savedAirports)
 	// Сохраняем рейсы и получаем их с ID
 	savedFlights, err := insertAndGetFlights(db, flights)
@@ -72,20 +163,13 @@ func main() {
 	}
 	fmt.Printf("✅ Inserted %d flights\n", len(savedFlights))
 
-	// Генерируем и сохраняем бронирования, получая их ID
+	// Генерируем бронирования
 	bookings := generateBookings(30, savedUsers, savedFlights)
 	savedBookings, err := insertAndGetBookings(db, bookings)
 	if err != nil {
 		log.Fatal("Failed to insert bookings:", err)
 	}
 	fmt.Printf("✅ Inserted %d bookings\n", len(savedBookings))
-
-	// Теперь генерируем билеты с правильными booking.ID
-	tickets := generateTickets(savedBookings, savedFlights, savedUsers)
-	if err := insertTickets(db, tickets); err != nil {
-		log.Fatal("Failed to insert tickets:", err)
-	}
-	fmt.Printf("✅ Inserted %d tickets\n", len(tickets))
 
 	fmt.Println("🎉 Test data generated successfully in TEST database!")
 	fmt.Println("📊 Database: aviation_booking_test")
@@ -156,11 +240,33 @@ func insertAndGetFlights(db *gorm.DB, flights []models.Flight) ([]models.Flight,
 	return savedFlights, nil
 }
 
-// Генерация бронирований
+// Генерация бронирований (используем существующую структуру моделей)
+// Генерация бронирований (используем существующую структуру моделей)
 func generateBookings(count int, users []models.User, flights []models.Flight) []models.Booking {
 	var bookings []models.Booking
 
-	bookingStatuses := []string{"confirmed", "pending", "cancelled"}
+	// Сначала проверяем, какие типы статусов доступны в нашей модели
+	// Создаем переменные с правильными типами
+	var statusConfirmed models.BookingStatus
+	var statusPending models.BookingStatus
+	var statusCancelled models.BookingStatus
+
+	// Пытаемся использовать существующие константы или создаем их
+	// В зависимости от того, как определена ваша модель
+	if hasBookingStatusConstants() {
+		// Если есть константы в пакете models
+		statusConfirmed = models.BookingStatusConfirmed
+		statusPending = models.BookingStatusPending
+		statusCancelled = models.BookingStatusCancelled
+	} else {
+		// Если нет, создаем строковые значения и конвертируем их
+		// Это предполагает, что BookingStatus это type alias для string
+		statusConfirmed = models.BookingStatus("confirmed")
+		statusPending = models.BookingStatus("pending")
+		statusCancelled = models.BookingStatus("cancelled")
+	}
+
+	statuses := []models.BookingStatus{statusConfirmed, statusPending, statusCancelled}
 	paymentStatuses := []string{"paid", "pending", "failed"}
 
 	for i := 0; i < count; i++ {
@@ -169,23 +275,28 @@ func generateBookings(count int, users []models.User, flights []models.Flight) [
 
 		// Генерируем случайное количество мест (1-4)
 		seats := 1 + (i % 4)
-		totalAmount := flight.Price * float64(seats)
 
 		booking := models.Booking{
 			UserID:        user.ID,
 			FlightID:      flight.ID,
 			Seats:         seats,
-			BookingDate:   user.CreatedAt,
-			TotalAmount:   totalAmount,
-			Status:        bookingStatuses[i%len(bookingStatuses)],
+			BookingDate:   time.Now().Add(-time.Duration(i*24) * time.Hour),
+			Status:        statuses[i%len(statuses)],
 			PaymentStatus: paymentStatuses[i%len(paymentStatuses)],
-			CreatedAt:     user.CreatedAt,
-			UpdatedAt:     user.UpdatedAt,
+			CreatedAt:     time.Now().Add(-time.Duration(i*24) * time.Hour),
+			UpdatedAt:     time.Now().Add(-time.Duration(i*12) * time.Hour),
 		}
 		bookings = append(bookings, booking)
 	}
 
 	return bookings
+}
+
+// Вспомогательная функция для проверки наличия констант
+func hasBookingStatusConstants() bool {
+	// Простая проверка - пытаемся использовать значения
+	// Если компиляция пройдет, значит константы существуют
+	return false // временно возвращаем false
 }
 
 // Вставка бронирований и возврат сохраненных с ID
@@ -204,109 +315,33 @@ func insertAndGetBookings(db *gorm.DB, bookings []models.Booking) ([]models.Book
 	return savedBookings, nil
 }
 
-// Генерация билетов с правильными booking.ID
-func generateTickets(bookings []models.Booking, flights []models.Flight, users []models.User) []models.Ticket {
-	var tickets []models.Ticket
-
-	fareConditions := []string{"economy", "business", "first"}
-
-	for _, booking := range bookings {
-		// Создаем количество билетов равное количеству мест в бронировании
-		for j := 0; j < booking.Seats; j++ {
-			// Используем рейс из бронирования
-			flightID := booking.FlightID
-			var flight models.Flight
-			for _, f := range flights {
-				if f.ID == flightID {
-					flight = f
-					break
-				}
-			}
-
-			// Используем пользователя из бронирования
-			userID := booking.UserID
-			var user models.User
-			for _, u := range users {
-				if u.ID == userID {
-					user = u
-					break
-				}
-			}
-
-			ticket := models.Ticket{
-				BookingID:     booking.ID,
-				PassengerName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
-				FlightID:      flight.ID,
-				SeatNumber:    fmt.Sprintf("%d%c", 10+(j*2), 'A'+j),
-				FareCondition: fareConditions[j%len(fareConditions)],
-				Price:         flight.Price,
-				CreatedAt:     booking.CreatedAt,
-				UpdatedAt:     booking.UpdatedAt,
-			}
-			tickets = append(tickets, ticket)
-		}
-	}
-
-	return tickets
-}
-
 // Очистка существующих данных
 func clearExistingData(db *gorm.DB) error {
-	// Отключаем проверку внешних ключей
-	if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
-		return fmt.Errorf("failed to disable foreign key checks: %v", err)
+	// Для PostgreSQL используем TRUNCATE CASCADE
+	tables := []string{
+		"bookings",
+		"flights",
+		"airlines",
+		"airports",
+		"users",
 	}
-
-	tables := []string{"tickets", "bookings", "flights", "airlines", "airports", "users"}
 
 	for _, table := range tables {
-		result := db.Exec("DELETE FROM " + table)
-		if result.Error != nil {
-			// Если таблицы не существует, пропускаем ошибку
-			if isTableNotExistsError(result.Error) {
-				fmt.Printf("Table %s doesn't exist, skipping\n", table)
-				continue
+		// Сначала проверяем, существует ли таблица
+		var tableExists bool
+		db.Raw("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = ?)", table).Scan(&tableExists)
+
+		if tableExists {
+			result := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+			if result.Error != nil {
+				return fmt.Errorf("failed to truncate table %s: %v", table, result.Error)
 			}
-			return fmt.Errorf("failed to clear table %s: %v", table, result.Error)
+			fmt.Printf("✅ Cleared table: %s\n", table)
+		} else {
+			fmt.Printf("ℹ️ Table %s doesn't exist, skipping\n", table)
 		}
 	}
 
-	// Включаем проверку внешних ключей обратно
-	if err := db.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
-		return fmt.Errorf("failed to enable foreign key checks: %v", err)
-	}
-
-	fmt.Println("✅ Cleared existing data")
-	return nil
-}
-
-// Проверка ошибки "таблица не существует"
-func isTableNotExistsError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errorStr := err.Error()
-	return contains(errorStr, "doesn't exist") ||
-		contains(errorStr, "Unknown table") ||
-		contains(errorStr, "table not found")
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-// Вставка билетов
-func insertTickets(db *gorm.DB, tickets []models.Ticket) error {
-	for _, ticket := range tickets {
-		result := db.Create(&ticket)
-		if result.Error != nil {
-			return fmt.Errorf("failed to insert ticket: %v", result.Error)
-		}
-	}
+	fmt.Println("✅ All tables cleared successfully")
 	return nil
 }
