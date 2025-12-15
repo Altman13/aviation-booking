@@ -235,8 +235,8 @@ type UpdateFlightRequest struct {
 	ArrivalAirportCode   string  `json:"arrival_airport_code"`
 	DepartureTime        string  `json:"departure_time"`
 	ArrivalTime          string  `json:"arrival_time"`
-	Price                float64 `json:"price" min="0"`
-	AvailableSeats       int     `json:"available_seats" min="0"`
+	Price                float64 `json:"price"`
+	AvailableSeats       int     `json:"available_seats"`
 }
 
 // UpdateFlight - полное обновление рейса
