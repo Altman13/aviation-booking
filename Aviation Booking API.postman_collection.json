@@ -1,0 +1,600 @@
+{
+	"info": {
+		"_postman_id": "731a9998-5e84-4cb8-8d34-67e46923d2d6",
+		"name": "Aviation Booking API",
+		"description": "Полная коллекция для тестирования API бронирования авиабилетов",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "5844092"
+	},
+	"item": [
+		{
+			"name": "🏥 Health Checks",
+			"item": [
+				{
+					"name": "Health Check (Full)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"health"
+							]
+						},
+						"description": "Полная проверка состояния системы (все компоненты)"
+					},
+					"response": []
+				},
+				{
+					"name": "Simple Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/health/simple",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"health",
+								"simple"
+							]
+						},
+						"description": "Базовая проверка доступности API"
+					},
+					"response": []
+				},
+				{
+					"name": "Readiness Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/ready",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"ready"
+							]
+						},
+						"description": "Проверка готовности приложения принимать трафик"
+					},
+					"response": []
+				},
+				{
+					"name": "Liveness Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/live",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"live"
+							]
+						},
+						"description": "Проверка живости приложения"
+					},
+					"response": []
+				},
+				{
+					"name": "Database Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/stats/db",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"stats",
+								"db"
+							]
+						},
+						"description": "Статистика подключений к базе данных"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👤 User Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"SecurePass123!\",\n    \"first_name\": \"John\",\n    \"last_name\": \"Doe\",\n    \"phone\": \"+79991234567\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Регистрация нового пользователя"
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Аутентификация пользователя"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh_token\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Обновление access токена"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/profile",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"profile"
+							]
+						},
+						"description": "Получение профиля текущего пользователя"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "✈️ Flight Search",
+			"item": [
+				{
+					"name": "Search Flights - Moscow to St Petersburg",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/flights/search?origin=SVO&destination=LED&departure_date=2024-01-20&adults=2&travel_class=ECONOMY&currency=RUB",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"search"
+							],
+							"query": [
+								{
+									"key": "origin",
+									"value": "SVO"
+								},
+								{
+									"key": "destination",
+									"value": "LED"
+								},
+								{
+									"key": "departure_date",
+									"value": "2024-01-20"
+								},
+								{
+									"key": "adults",
+									"value": "2"
+								},
+								{
+									"key": "travel_class",
+									"value": "ECONOMY"
+								},
+								{
+									"key": "currency",
+									"value": "RUB"
+								}
+							]
+						},
+						"description": "Поиск рейсов с фильтрами"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Flights - Round Trip",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/flights/search?origin=DME&destination=AER&departure_date=2024-02-15&return_date=2024-02-22&adults=1&travel_class=BUSINESS&currency=RUB",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"search"
+							],
+							"query": [
+								{
+									"key": "origin",
+									"value": "DME"
+								},
+								{
+									"key": "destination",
+									"value": "AER"
+								},
+								{
+									"key": "departure_date",
+									"value": "2024-02-15"
+								},
+								{
+									"key": "return_date",
+									"value": "2024-02-22"
+								},
+								{
+									"key": "adults",
+									"value": "1"
+								},
+								{
+									"key": "travel_class",
+									"value": "BUSINESS"
+								},
+								{
+									"key": "currency",
+									"value": "RUB"
+								}
+							]
+						},
+						"description": "Поиск рейсов туда и обратно"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Flight Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/flights/SU-1234-2024-01-20",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"SU-1234-2024-01-20"
+							]
+						},
+						"description": "Получение детальной информации о рейсе"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Flight Availability",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/flights/SU-1234-2024-01-20/availability",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"flights",
+								"SU-1234-2024-01-20",
+								"availability"
+							]
+						},
+						"description": "Проверка доступности мест на рейсе"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📖 Booking Management",
+			"item": [
+				{
+					"name": "Create Booking - Economy",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"flight_id\": \"SU-1234-2024-01-20\",\n    \"passengers\": [\n        {\n            \"first_name\": \"John\",\n            \"last_name\": \"Doe\",\n            \"birth_date\": \"1990-01-01\",\n            \"document_number\": \"1234567890\",\n            \"seat_preference\": \"window\"\n        },\n        {\n            \"first_name\": \"Jane\",\n            \"last_name\": \"Doe\",\n            \"birth_date\": \"1992-05-15\",\n            \"document_number\": \"0987654321\",\n            \"seat_preference\": \"aisle\"\n        }\n    ],\n    \"contact_info\": {\n        \"email\": \"john.doe@example.com\",\n        \"phone\": \"+79991234567\"\n    },\n    \"payment_method\": \"card\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/bookings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"bookings"
+							]
+						},
+						"description": "Создание нового бронирования"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Booking - Business Class",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"flight_id\": \"S7-5678-2024-02-15\",\n    \"passengers\": [\n        {\n            \"first_name\": \"Alex\",\n            \"last_name\": \"Smith\",\n            \"birth_date\": \"1985-08-20\",\n            \"document_number\": \"1122334455\",\n            \"seat_preference\": \"front\",\n            \"special_requests\": \"Vegetarian meal\"\n        }\n    ],\n    \"contact_info\": {\n        \"email\": \"alex.smith@example.com\",\n        \"phone\": \"+79998887766\"\n    },\n    \"payment_method\": \"card\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/bookings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"bookings"
+							]
+						},
+						"description": "Создание бронирования бизнес-класса"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Bookings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/bookings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"bookings"
+							]
+						},
+						"description": "Получение всех бронирований пользователя"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Booking Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/bookings/BOOK-001",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"bookings",
+								"BOOK-001"
+							]
+						},
+						"description": "Получение детальной информации о бронировании"
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Booking",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/bookings/BOOK-001/cancel",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"bookings",
+								"BOOK-001",
+								"cancel"
+							]
+						},
+						"description": "Отмена бронирования"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Booking Receipt",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/bookings/BOOK-001/receipt",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"bookings",
+								"BOOK-001",
+								"receipt"
+							]
+						},
+						"description": "Получение квитанции об оплате"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Pre-request script can be added here"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Test scripts can be added here"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "",
+			"type": "string",
+			"description": "JWT access token после успешного логина"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string",
+			"description": "Refresh token для обновления access token"
+		}
+	]
+}
