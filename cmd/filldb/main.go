@@ -162,6 +162,12 @@ func main() {
 	}
 	fmt.Printf("✅ Inserted %d bookings\n", len(bookings))
 
+	tickets, err := generateAndInsertTickets(db, bookings, savedFlights, generator)
+	if err != nil {
+		log.Fatal("Failed to insert tickets:", err)
+	}
+	fmt.Printf("✅ Inserted %d tickets\n", len(tickets))
+
 	fmt.Println("🎉 Test data generated successfully in TEST database!")
 	fmt.Println("📊 Database: aviation_booking_test")
 	fmt.Println("🚀 You can now run your application with: go run cmd/server/main.go")
@@ -227,7 +233,6 @@ func insertAndGetFlights(db *gorm.DB, flights []models.Flight) ([]models.Flight,
 	return savedFlights, nil
 }
 
-// Генерация и вставка бронирований
 // Генерация и вставка бронирований
 func generateAndInsertBookings(db *gorm.DB, count int, users []models.User, flights []models.Flight, generator *SimpleGenerator) ([]models.Booking, error) {
 	var savedBookings []models.Booking
@@ -303,10 +308,68 @@ func generateAndInsertBookings(db *gorm.DB, count int, users []models.User, flig
 	return savedBookings, nil
 }
 
+// Генерация и вставка билетов
+func generateAndInsertTickets(db *gorm.DB, bookings []models.Booking, flights []models.Flight, generator *SimpleGenerator) ([]models.Ticket, error) {
+	var savedTickets []models.Ticket
+
+	firstNames := []string{"Иван", "Анна", "Петр", "Мария", "Алексей", "Елена", "Сергей", "Ольга"}
+	lastNames := []string{"Иванов", "Петрова", "Сидоров", "Смирнова", "Кузнецов", "Попова"}
+	fareConditions := []string{"Economy", "Business", "First"}
+
+	for _, booking := range bookings {
+		// Для каждого места в бронировании создаем отдельный билет
+		for seatNum := 1; seatNum <= booking.Seats; seatNum++ {
+			// Генерируем имя пассажира
+			passengerName := fmt.Sprintf("%s %s",
+				firstNames[generator.random.Intn(len(firstNames))],
+				lastNames[generator.random.Intn(len(lastNames))],
+			)
+
+			// Генерируем номер места
+			seatNumber := fmt.Sprintf("%d%c",
+				1+generator.random.Intn(30),
+				'A'+rune(generator.random.Intn(6)),
+			)
+
+			// Определяем условия тарифа на основе класса бронирования
+			fareCondition := fareConditions[0] // По умолчанию Economy
+			switch booking.Class {
+			case models.BookingClassBusiness:
+				fareCondition = fareConditions[1]
+			case models.BookingClassFirst:
+				fareCondition = fareConditions[2]
+			}
+
+			// Расчет цены билета (общая цена / количество мест)
+			ticketPrice := booking.TotalPrice / float64(booking.Seats)
+
+			ticket := models.Ticket{
+				BookingID:     booking.ID,
+				PassengerName: passengerName,
+				FlightID:      booking.FlightID,
+				SeatNumber:    seatNumber,
+				FareCondition: fareCondition,
+				Price:         ticketPrice,
+				CreatedAt:     booking.CreatedAt,
+				UpdatedAt:     booking.UpdatedAt,
+			}
+
+			result := db.Create(&ticket)
+			if result.Error != nil {
+				return nil, fmt.Errorf("failed to insert ticket: %v", result.Error)
+			}
+			savedTickets = append(savedTickets, ticket)
+		}
+	}
+
+	return savedTickets, nil
+}
+
 // Очистка существующих данных
 func clearExistingData(db *gorm.DB) error {
 	// Для MariaDB/MySQL
 	tables := []string{
+		"tickets",
 		"bookings",
 		"flights",
 		"airlines",
@@ -332,7 +395,7 @@ func clearExistingData(db *gorm.DB) error {
 			}
 
 			// Сбрасываем автоинкремент для таблиц с ID
-			if table != "users" && table != "bookings" {
+			if table != "users" && table != "bookings" && table != "tickets" {
 				db.Exec(fmt.Sprintf("ALTER TABLE %s AUTO_INCREMENT = 1", table))
 			}
 
