@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"aviation-booking/config"
+	"context"
 	"net/http"
 	"time"
 
@@ -33,6 +34,12 @@ type DatabaseStatus struct {
 type TimeStamps struct {
 	Server string `json:"server"`
 	Unix   int64  `json:"unix"`
+}
+
+// DatabaseInfo содержит информацию о БД
+type DatabaseInfo struct {
+	Version     string
+	TablesCount int
 }
 
 // HealthCheck проверяет статус сервера и базы данных с GORM
@@ -101,12 +108,6 @@ func HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// DatabaseInfo содержит информацию о БД
-type DatabaseInfo struct {
-	Version     string
-	TablesCount int
-}
-
 // getDatabaseInfo получает информацию о базе данных
 func getDatabaseInfo() DatabaseInfo {
 	info := DatabaseInfo{
@@ -114,11 +115,20 @@ func getDatabaseInfo() DatabaseInfo {
 		TablesCount: 0,
 	}
 
+	// Проверяем DB
+	if config.DB == nil {
+		return info
+	}
+
 	// Получаем версию MySQL
 	var version string
 	sqlDB, err := config.DB.DB()
-	if err == nil {
-		err = sqlDB.QueryRow("SELECT VERSION()").Scan(&version)
+	if err == nil && sqlDB != nil {
+		// Используем контекст с таймаутом
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		err = sqlDB.QueryRowContext(ctx, "SELECT VERSION()").Scan(&version)
 		if err == nil {
 			info.Version = version
 		}
@@ -143,6 +153,41 @@ func SimpleHealth(c *gin.Context) {
 
 // DatabaseStats возвращает статистику базы данных с GORM
 func DatabaseStats(c *gin.Context) {
+	// ПРОВЕРКА: Добавлена проверка на nil
+	if config.DB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":  "error",
+			"message": "Database not initialized",
+			"data":    nil,
+		})
+		return
+	}
+
+	// Проверка соединения с БД
+	sqlDB, err := config.DB.DB()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":  "error",
+			"message": "Failed to get database connection: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	// Пинг базы данных
+	if err := sqlDB.Ping(); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":  "error",
+			"message": "Database ping failed: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	// Создаем контекст с таймаутом для запросов
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
 	stats := gin.H{
 		"database": gin.H{
 			"status": "connected",
@@ -155,7 +200,8 @@ func DatabaseStats(c *gin.Context) {
 
 	for _, table := range tables {
 		var count int64
-		result := config.DB.Table(table).Count(&count)
+		// Используем контекст с таймаутом
+		result := config.DB.WithContext(ctx).Table(table).Count(&count)
 		if result.Error != nil {
 			stats["tables"].(gin.H)[table] = gin.H{
 				"count": 0,
@@ -190,7 +236,7 @@ func ReadyCheck(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":  "not_ready",
-			"message": "Failed to get database connection",
+			"message": "Failed to get database connection: " + err.Error(),
 		})
 		return
 	}
@@ -200,7 +246,7 @@ func ReadyCheck(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":  "not_ready",
-			"message": "Database ping failed",
+			"message": "Database ping failed: " + err.Error(),
 		})
 		return
 	}
@@ -218,4 +264,22 @@ func LiveCheck(c *gin.Context) {
 		"message":   "Service is running",
 		"timestamp": time.Now().Unix(),
 	})
+}
+
+// checkDatabaseConnection общая функция для проверки состояния подключения к БД
+func checkDatabaseConnection() (bool, string) {
+	if config.DB == nil {
+		return false, "Database not initialized"
+	}
+
+	sqlDB, err := config.DB.DB()
+	if err != nil {
+		return false, "Failed to get database connection: " + err.Error()
+	}
+
+	if err := sqlDB.Ping(); err != nil {
+		return false, "Database ping failed: " + err.Error()
+	}
+
+	return true, ""
 }

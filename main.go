@@ -3,16 +3,34 @@ package main
 import (
 	"aviation-booking/config"
 	"aviation-booking/controllers"
+	"log"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Инициализация базы данных
-	config.InitDB()
+	// 1. Инициализируем конфигурацию
+	config.Init()
+
+	// 2. Инициализация базы данных с проверкой ошибки
+	if err := config.InitDB(); err != nil {
+		log.Fatal("❌ Failed to initialize database:", err)
+	}
+
+	// 3. Проверяем, что соединение с БД работает
+	sqlDB, err := config.DB.DB()
+	if err != nil {
+		log.Fatal("❌ Failed to get database instance:", err)
+	}
+	if err := sqlDB.Ping(); err != nil {
+		log.Fatal("❌ Database ping failed:", err)
+	}
+	log.Println("✅ Database connection successful")
+
+	// 4. Закрываем БД при завершении программы
 	defer config.CloseDB()
 
-	// Создание маршрутов
+	// 5. Создание маршрутов
 	r := gin.Default()
 
 	// Создаем контроллеры
@@ -91,6 +109,9 @@ func main() {
 	r.GET("/bookings/:user_id", bookingController.GetUserBookings)
 	r.DELETE("/bookings/:booking_id", bookingController.CancelBooking)
 
-	// Запуск сервера
-	r.Run(":8080")
+	// 6. Запуск сервера
+	log.Println("🚀 Server starting on :8080")
+	if err := r.Run(":8080"); err != nil {
+		log.Fatal("❌ Failed to start server:", err)
+	}
 }
