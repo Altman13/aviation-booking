@@ -60,7 +60,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="container">
-          <div className="logo">Aviasales</div>
+          <div className="logo">Astalavista</div>
         </div>
       </header>
 
