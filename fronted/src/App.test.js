@@ -7,7 +7,7 @@ describe('App Integration Tests', () => {
   test('renders main application with tickets', async () => {
     render(<App />);
     
-    expect(screen.getByText(/aviasales/i)).toBeInTheDocument();
+    expect(screen.getByText(/Astalavista/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /найти билеты/i })).toBeInTheDocument();
     
     await waitFor(() => {
