@@ -56,7 +56,7 @@ func InitTestDB() error {
 
 	// Получаем значения из config/config.go
 	dbUser := GetEnv("DB_USER", "root")
-	dbPassword := GetEnv("DB_PASSWORD", "root")
+	dbPassword := GetEnv("DB_PASSWORD", "")
 	dbHost := GetEnv("DB_HOST", "127.0.0.1")
 	dbPort := GetEnv("DB_PORT", "3306")
 	dbName := GetEnv("DB_NAME", "aviation_booking")
